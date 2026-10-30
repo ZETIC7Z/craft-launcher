@@ -1,0 +1,87 @@
+name: Build & Release Zetica Hub
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release tag (e.g. v0.10.0)'
+        required: true
+        default: 'v0.10.0'
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    name: Build Windows x64
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cache Cargo Dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build Release Binary
+        run: cargo build --release -p artcraft-launcher
+
+      - name: Package Windows Artifact
+        shell: pwsh
+        run: |
+          mkdir dist
+          Copy-Item target/release/artcraft-launcher.exe dist/zetica-hub.exe
+          Copy-Item README.md dist/
+          Copy-Item LICENSE-MIT dist/
+          Compress-Archive -Path dist/* -DestinationPath zetica-hub-windows-x64.zip
+
+      - name: Upload Windows Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: zetica-hub-windows-x64
+          path: zetica-hub-windows-x64.zip
+
+  create-release:
+    name: Create GitHub Release
+    needs: [build-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download Windows Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: zetica-hub-windows-x64
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag_name || github.ref_name }}
+          name: Zetica Hub ${{ github.event.inputs.tag_name || github.ref_name }}
+          body: |
+            ## Zetica Hub Release ${{ github.event.inputs.tag_name || github.ref_name }}
+            
+            Official native installer and hub for the ZETICA Creative Suite.
+            
+            ### Included Packages:
+            - `zetica-hub-windows-x64.zip`: Standalone portable binary for Windows 64-bit
+            
+            Developed by **Sam Pangilinan** ([zeticuz.xyz](https://www.zeticuz.xyz/)).
+          files: |
+            zetica-hub-windows-x64.zip
+          draft: false
+          prerelease: false

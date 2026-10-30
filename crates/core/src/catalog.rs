@@ -67,7 +67,7 @@ impl CraftApp {
 
     /// The app's website: its page on getartcraft.com, or a community app's own site.
     pub fn website(&self) -> String {
-        self.site.map_or_else(|| format!("https://getartcraft.com/apps/{}", self.id), str::to_string)
+        self.site.map_or_else(|| format!("https://zetica.xyz/apps/{}", self.id), str::to_string)
     }
 
     /// Whether the launcher installs this app from a `kind` package.
@@ -113,7 +113,7 @@ const fn app(
         former_ids: &[],
         former_names: &[],
         kind: AppKind::Official,
-        publisher: "ArtCraft",
+        publisher: "ZETICA",
         msi_publisher: None,
         bundle: None,
         former_bundles: &[],
@@ -156,7 +156,7 @@ pub const SUITE: [CraftApp; 14] = [
         "EffectCraft",
         "Motion graphics and visual effects",
         [[0xe0, 0x36, 0x8f], [0xb0, 0x20, 0x6c], [0xff, 0x7a, 0xb8]],
-        "storytold/effectcraft",
+        "ZETIC7Z/effectcraft",
     ),
     app(
         "designcraft",
