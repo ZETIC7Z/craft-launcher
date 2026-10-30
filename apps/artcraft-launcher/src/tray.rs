@@ -107,12 +107,12 @@ impl Tray {
             }
         }));
         let labels = vec![
-            (show, "Show ArtCraft Launcher"),
+            (show, "Show Zetica Hub"),
             (check, "Check for Updates"),
-            (website, "Visit getartcraft.com"),
-            (github, "ArtCraft on GitHub"),
-            (discord, "Join the ArtCraft Discord"),
-            (quit, "Quit ArtCraft Launcher"),
+            (website, "Visit zetica.xyz"),
+            (github, "Zetica on GitHub"),
+            (discord, "Join the Zetica Discord"),
+            (quit, "Quit Zetica Hub"),
         ];
         Ok(Self { icon, show: show_id, check: check_id, quit: quit_id, rx, tooltip: String::new(), language: String::new(), labels })
     }
@@ -130,9 +130,9 @@ impl Tray {
             self.language = lang.code().to_string();
         }
         let tip = if count == 0 {
-            "ArtCraft Launcher".to_string()
+            "Zetica Hub".to_string()
         } else {
-            i18n::trn(lang, count as u64, "ArtCraft Launcher · {n} update available", "ArtCraft Launcher · {n} updates available")
+            i18n::trn(lang, count as u64, "Zetica Hub · {n} update available", "Zetica Hub · {n} updates available")
         };
         if tip != self.tooltip {
             let _ = self.icon.set_tooltip(Some(&tip));

@@ -124,85 +124,125 @@ const fn app(
 
 /// The Craft App Suite, in display order matching getartcraft.com, then the community apps:
 pub const SUITE: [CraftApp; 14] = [
-    app("photocraft", "PhotoCraft", "Image editing", [[0x2f, 0x7b, 0xf5], [0x1a, 0x5b, 0xc4], [0x7f, 0xb0, 0xff]], "storytold/photocraft"),
-    app("vectorcraft", "VectorCraft", "Vector illustration", [[0xe8, 0x57, 0x3f], [0xb8, 0x3a, 0x24], [0xff, 0x8a, 0x70]], "storytold/vectorcraft"),
-    app(
-        "filmcraft",
-        "FilmCraft",
-        "Video editing, color and sound",
-        [[0x8b, 0x5c, 0xf6], [0x6a, 0x3f, 0xd6], [0xb6, 0x9c, 0xff]],
-        "storytold/filmcraft",
-    ),
-    app(
-        "lightcraft",
-        "LightCraft",
-        "Photo library and raw development",
-        [[0xf2, 0xa5, 0x16], [0x8a, 0x58, 0x00], [0xff, 0xc1, 0x4d]],
-        "storytold/lightcraft",
-    ),
     CraftApp {
-        former_ids: &["printcraft"],
-        former_names: &["PrintCraft"],
+        former_ids: &["photocraft"],
+        former_names: &["PhotoCraft", "Photo"],
+        ..app("photocraft", "Zetica Photo", "Image editing", [[0x2f, 0x7b, 0xf5], [0x1a, 0x5b, 0xc4], [0x7f, 0xb0, 0xff]], "ZETIC7Z/photocraft")
+    },
+    CraftApp {
+        former_ids: &["vectorcraft"],
+        former_names: &["VectorCraft", "Vector"],
+        ..app("vectorcraft", "Zetica Vector", "Vector illustration", [[0xe8, 0x57, 0x3f], [0xb8, 0x3a, 0x24], [0xff, 0x8a, 0x70]], "ZETIC7Z/vectorcraft")
+    },
+    CraftApp {
+        former_ids: &["filmcraft"],
+        former_names: &["FilmCraft", "Film"],
         ..app(
-            "pdfcraft",
-            "PdfCraft",
-            "Reading, organizing and protecting PDFs",
-            [[0xe8, 0x20, 0x4f], [0xb7, 0x02, 0x28], [0xf2, 0x3a, 0x62]],
-            "storytold/pdfcraft",
+            "filmcraft",
+            "Zetica Film",
+            "Video editing, color and sound",
+            [[0x8b, 0x5c, 0xf6], [0x6a, 0x3f, 0xd6], [0xb6, 0x9c, 0xff]],
+            "ZETIC7Z/filmcraft",
         )
     },
     CraftApp {
-        former_ids: &["zetica-motion", "zetica-effect"],
-        former_names: &["Zetica Motion", "Zetica Effect"],
+        former_ids: &["lightcraft"],
+        former_names: &["LightCraft", "Light"],
+        ..app(
+            "lightcraft",
+            "Zetica Light",
+            "Photo library and raw development",
+            [[0xf2, 0xa5, 0x16], [0x8a, 0x58, 0x00], [0xff, 0xc1, 0x4d]],
+            "ZETIC7Z/lightcraft",
+        )
+    },
+    CraftApp {
+        former_ids: &["printcraft", "pdfcraft"],
+        former_names: &["PdfCraft", "PrintCraft", "PDF"],
+        ..app(
+            "pdfcraft",
+            "Zetica PDF",
+            "Reading, organizing and protecting PDFs",
+            [[0xe8, 0x20, 0x4f], [0xb7, 0x02, 0x28], [0xf2, 0x3a, 0x62]],
+            "ZETIC7Z/pdfcraft",
+        )
+    },
+    CraftApp {
+        former_ids: &["effectcraft", "zetica-motion", "zetica-effect"],
+        former_names: &["EffectCraft", "Zetica Motion", "Zetica Effect", "Effect"],
         ..app(
             "effectcraft",
-            "EffectCraft",
+            "Zetica Motion",
             "Motion graphics and visual effects",
             [[0xe0, 0x36, 0x8f], [0xb0, 0x20, 0x6c], [0xff, 0x7a, 0xb8]],
             "ZETIC7Z/effectcraft",
         )
     },
-    app(
-        "designcraft",
-        "DesignCraft",
-        "Page layout and publishing",
-        [[0x7b, 0xb5, 0x1c], [0x45, 0x70, 0x08], [0xa6, 0xe0, 0x4a]],
-        "storytold/designcraft",
-    ),
-    app(
-        "figcraft",
-        "FigCraft",
-        "Interface design and prototyping",
-        [[0x02, 0xda, 0x96], [0x04, 0x7a, 0x56], [0x4f, 0xe8, 0xb6]],
-        "storytold/figcraft",
-    ),
-    app("wordcraft", "WordCraft", "Writing and document design", [[0x3f, 0x5f, 0xe0], [0x2a, 0x44, 0xb8], [0x8e, 0xa2, 0xff]], "storytold/wordcraft"),
-    app(
-        "soundcraft",
-        "SoundCraft",
-        "Recording, editing and mixing audio",
-        [[0x1f, 0xa5, 0xc9], [0x0e, 0x72, 0x90], [0x5f, 0xd0, 0xee]],
-        "storytold/soundcraft",
-    ),
     CraftApp {
-        former_ids: &["zetica-deck"],
-        former_names: &["Zetica Deck"],
+        former_ids: &["designcraft"],
+        former_names: &["DesignCraft", "Design"],
+        ..app(
+            "designcraft",
+            "Zetica Design",
+            "Page layout and publishing",
+            [[0x7b, 0xb5, 0x1c], [0x45, 0x70, 0x08], [0xa6, 0xe0, 0x4a]],
+            "ZETIC7Z/designcraft",
+        )
+    },
+    CraftApp {
+        former_ids: &["figcraft"],
+        former_names: &["FigCraft", "Fig"],
+        ..app(
+            "figcraft",
+            "Zetica Fig",
+            "Interface design and prototyping",
+            [[0x02, 0xda, 0x96], [0x04, 0x7a, 0x56], [0x4f, 0xe8, 0xb6]],
+            "ZETIC7Z/figcraft",
+        )
+    },
+    CraftApp {
+        former_ids: &["wordcraft"],
+        former_names: &["WordCraft", "Word"],
+        ..app("wordcraft", "Zetica Word", "Writing and document design", [[0x3f, 0x5f, 0xe0], [0x2a, 0x44, 0xb8], [0x8e, 0xa2, 0xff]], "ZETIC7Z/wordcraft")
+    },
+    CraftApp {
+        former_ids: &["soundcraft"],
+        former_names: &["SoundCraft", "Sound"],
+        ..app(
+            "soundcraft",
+            "Zetica Sound",
+            "Recording, editing and mixing audio",
+            [[0x1f, 0xa5, 0xc9], [0x0e, 0x72, 0x90], [0x5f, 0xd0, 0xee]],
+            "ZETIC7Z/soundcraft",
+        )
+    },
+    CraftApp {
+        former_ids: &["deckcraft", "zetica-deck"],
+        former_names: &["DeckCraft", "Zetica Deck", "Deck"],
         ..app(
             "deckcraft",
-            "DeckCraft",
+            "Zetica Deck",
             "Presentations and slide shows",
             [[0xf0, 0x7a, 0x1e], [0xa8, 0x4f, 0x0a], [0xff, 0xa0, 0x60]],
             "ZETIC7Z/deckcraft",
         )
     },
-    app(
-        "cadcraft",
-        "CADCraft",
-        "Computer-aided design and drafting",
-        [[0x3e, 0xa6, 0xe8], [0x1a, 0x6f, 0xa8], [0x7c, 0xc8, 0xff]],
-        "storytold/cadcraft",
-    ),
-    app("gridcraft", "GridCraft", "Spreadsheets and data", [[0x1f, 0x9d, 0x55], [0x12, 0x70, 0x3a], [0x4f, 0xd6, 0x8a]], "storytold/gridcraft"),
+    CraftApp {
+        former_ids: &["cadcraft"],
+        former_names: &["CADCraft", "CAD"],
+        ..app(
+            "cadcraft",
+            "Zetica CAD",
+            "Computer-aided design and drafting",
+            [[0x3e, 0xa6, 0xe8], [0x1a, 0x6f, 0xa8], [0x7c, 0xc8, 0xff]],
+            "ZETIC7Z/cadcraft",
+        )
+    },
+    CraftApp {
+        former_ids: &["gridcraft"],
+        former_names: &["GridCraft", "Grid"],
+        ..app("gridcraft", "Zetica Grid", "Spreadsheets and data", [[0x1f, 0x9d, 0x55], [0x12, 0x70, 0x3a], [0x4f, 0xd6, 0x8a]], "ZETIC7Z/gridcraft")
+    },
     CraftApp {
         kind: AppKind::Community,
         publisher: "Tangency Labs",

@@ -92,10 +92,33 @@ impl LauncherUi {
             if bar == TitleBar::MacOs {
                 ui.add_space(TRAFFIC_LIGHTS_W);
             }
-            // The Zetica monogram/wordmark, in its own cell.
-            let logo = vec2(14.0 * crate::icons::ARTCRAFT_LOGO_ASPECT, 14.0);
-            let (cell, _) = ui.allocate_exact_size(vec2(logo.x + 40.0, h), Sense::hover());
-            egui::Image::new(crate::icons::artcraft_logo(t.dark)).alt_text(tl!("ZETICA")).paint_at(ui, Rect::from_center_size(cell.center(), logo));
+            ui.add_space(14.0);
+            // ZE monogram logo
+            let logo_size = vec2(18.0, 18.0);
+            let (logo_rect, _) = ui.allocate_exact_size(vec2(logo_size.x, h), Sense::hover());
+            egui::Image::new(crate::icons::artcraft_logo(t.dark))
+                .alt_text(tl!("ZETICA"))
+                .paint_at(ui, Rect::from_center_size(logo_rect.center(), logo_size));
+            ui.add_space(8.0);
+            // Bold ZETICA wordmark
+            let wordmark = RichText::new("ZETICA").size(16.0).family(theme::display()).color(t.ink_strong);
+            let galley = ui.painter().layout_no_wrap(wordmark.text().to_string(), egui::FontId::new(16.0, theme::display()), t.ink_strong);
+            let (wm_rect, _) = ui.allocate_exact_size(vec2(galley.size().x, h), Sense::hover());
+            ui.painter().galley(egui::pos2(wm_rect.left(), wm_rect.center().y - galley.size().y / 2.0), galley, t.ink_strong);
+            ui.add_space(10.0);
+            // HUB pill badge
+            let badge_galley = widgets::caps(ui, tl!("HUB"), theme::HUD_SIZE, theme::mono_bold(), theme::HUD_SPACING, Color32::WHITE);
+            let (badge_rect, _) = ui.allocate_exact_size(vec2(badge_galley.size().x + 14.0, 20.0), Sense::hover());
+            let badge_pos = egui::pos2(badge_rect.left(), (h - 20.0) / 2.0);
+            let drawn_badge = Rect::from_min_size(badge_pos, vec2(badge_galley.size().x + 14.0, 20.0));
+            ui.painter().rect_filled(drawn_badge, CornerRadius::same(3), t.accent);
+            ui.painter().galley(drawn_badge.center() - badge_galley.size() / 2.0, badge_galley, Color32::WHITE);
+            ui.add_space(14.0);
+            widgets::rule(ui, h);
+            ui.add_space(14.0);
+            // ZETICA APP SUITE HUD label
+            widgets::hud(ui, tl!("ZETICA APP SUITE"), t.muted);
+
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if bar == TitleBar::Custom {
                     widgets::window_buttons(ui, h);
@@ -103,14 +126,6 @@ impl LauncherUi {
                 if widgets::nav_icon(ui, widgets::Glyph::Settings, tl!("Settings"), h, false).clicked() {
                     self.dialog = Some(Dialog::Settings);
                 }
-                // The controls reserve their actual widths before the secondary text gets space.
-                ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
-                    if ui.available_width() >= 17.0 + widgets::hud_galley(ui, tl!("ZETICA APP SUITE"), t.muted).size().x {
-                        widgets::rule(ui, h);
-                        ui.add_space(16.0);
-                        widgets::hud(ui, tl!("ZETICA APP SUITE"), t.muted);
-                    }
-                });
             });
         });
     }

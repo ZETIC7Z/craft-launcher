@@ -130,7 +130,7 @@ fn main() -> ExitCode {
             let result = {
                 let (waker, launcher) = (waker.clone(), &mut launcher);
                 eframe::run_native(
-                    "ArtCraft Launcher",
+                    "Zetica Hub",
                     native_options(hidden),
                     Box::new(move |cc| {
                         launcher.open(cc, &waker);

@@ -397,9 +397,9 @@ pub fn default_folder(kind: PackageKind, arch: Option<Arch>, paths: &Paths) -> O
         match kind {
             PackageKind::Msi => match arch {
                 Some(Arch::X86) => {
-                    Some(PathBuf::from(std::env::var_os("ProgramFiles(x86)").or_else(|| std::env::var_os("ProgramFiles"))?).join("ArtCraft"))
+                    Some(PathBuf::from(std::env::var_os("ProgramFiles(x86)").or_else(|| std::env::var_os("ProgramFiles"))?).join("Zetica"))
                 }
-                Some(_) => Some(PathBuf::from(std::env::var_os("ProgramFiles")?).join("ArtCraft")),
+                Some(_) => Some(PathBuf::from(std::env::var_os("ProgramFiles")?).join("Zetica")),
                 None => None,
             },
             PackageKind::PortableZip => Some(paths.apps()),

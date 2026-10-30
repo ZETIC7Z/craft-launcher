@@ -154,7 +154,7 @@ impl LauncherUi {
     fn launcher_update_dialog(&mut self, ui: &mut egui::Ui, r: &artcraft_launcher_core::Release) -> bool {
         let t = Tokens::get(ui.ctx());
         ui.set_width(480.0f32.min(ui.ctx().content_rect().width() - 80.0));
-        let title = fmt(tl!("ArtCraft Launcher {version} is available."), &[("version", &r.version_label())]);
+        let title = fmt(tl!("Zetica Hub {version} is available."), &[("version", &r.version_label())]);
         Self::title(ui, Some(crate::icons::artcraft_mark()), &title, "");
         let message = if self.caps.self_update {
             tl!("A new version is available. Would you like to relaunch with the updated version?")
@@ -266,7 +266,14 @@ impl LauncherUi {
     fn install_dialog(&mut self, ui: &mut egui::Ui, id: &str, folder: &mut String, host: &mut dyn Host) -> bool {
         let Some(app) = self.entry(id).map(|e| e.app) else { return true };
         ui.set_width(440.0f32.min(ui.ctx().content_rect().width() - 80.0));
-        Self::title(ui, None, app.name, tl!("Install folder"));
+        let title = if app.kind == artcraft_launcher_core::catalog::AppKind::Official {
+            let clean = app.name.strip_prefix("Zetica ").unwrap_or(app.name);
+            let suffix = clean.strip_suffix("Craft").unwrap_or(clean).to_uppercase();
+            format!("ZETICA {suffix}")
+        } else {
+            app.name.to_string()
+        };
+        Self::title(ui, crate::icons::app(id), &title, tl!("Install folder"));
         let default = self.settings.install_locations.root.clone().or_else(|| self.default_folder_for(id, host));
         Self::folder_field(ui, folder, default.as_deref(), host);
         if self.platform.is_some_and(|p| p.os == Os::Linux) {

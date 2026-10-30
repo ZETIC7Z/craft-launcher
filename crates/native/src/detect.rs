@@ -97,7 +97,16 @@ const PUBLISHER: &str = "Learning Machines LLC";
 /// installers have registered.
 #[cfg_attr(not(windows), allow(dead_code))]
 fn is_installer_entry(app: &CraftApp, display_name: &str, publisher: &str) -> bool {
-    publisher == app.msi_publisher.unwrap_or(PUBLISHER) && app.names().any(|n| n == display_name)
+    let publisher_ok = publisher == "ZETICA / Sam Pangilinan"
+        || publisher == "ZETICA"
+        || publisher == "Sam Pangilinan"
+        || publisher == app.msi_publisher.unwrap_or(PUBLISHER)
+        || publisher == PUBLISHER;
+    if !publisher_ok {
+        return false;
+    }
+    let clean_name = display_name.strip_suffix(" (Craft Apps)").unwrap_or(display_name).trim();
+    app.names().any(|n| n.eq_ignore_ascii_case(display_name) || n.eq_ignore_ascii_case(clean_name))
 }
 
 /// Where a Windows install of `app` may keep its exe, in the order to try: the entry's
@@ -111,24 +120,33 @@ fn exe_candidates(app: &CraftApp, location: Option<&Path>, program_files: &[Path
     dirs.flat_map(|d| app.stems().map(move |s| d.join(format!("{s}.exe")))).collect()
 }
 
-/// The folder under `ArtCraft` that the MSI installs to when it is not the display name: the launcher
-/// installs to `ArtCraft\Launcher`, the apps to `ArtCraft\<App>`.
+/// The folder under `Zetica` or `ArtCraft` that the MSI installs to when it is not the display name.
 #[cfg_attr(not(windows), allow(dead_code))]
 fn suite_folders(app: &CraftApp, roots: &[PathBuf]) -> Vec<PathBuf> {
-    if app.id != artcraft_launcher_core::catalog::LAUNCHER_ID {
-        return Vec::new();
-    }
-    roots.iter().flat_map(|root| [
-        root.join("Zetica").join("Hub"),
-        root.join("ArtCraft").join("Launcher"),
-    ]).collect()
+    roots.iter().flat_map(|root| {
+        let mut v = Vec::new();
+        if app.id == artcraft_launcher_core::catalog::LAUNCHER_ID {
+            v.push(root.join("Zetica").join("Hub"));
+            v.push(root.join("ArtCraft").join("Launcher"));
+        } else {
+            for n in app.names() {
+                v.push(root.join("Zetica").join(n));
+                v.push(root.join("ArtCraft").join(n));
+            }
+        }
+        v
+    }).collect()
 }
 
-/// The registry keys an MSI records its install folder in (value `InstallDir`). The launcher's package
-/// keeps its own key, under the publisher name.
+/// The registry keys an MSI records its install folder in (value `InstallDir`).
 #[cfg_attr(not(windows), allow(dead_code))]
 fn install_dir_keys(app: &CraftApp) -> Vec<String> {
     let mut keys = vec![format!(r"SOFTWARE\{}", app.name)];
+    for n in app.names() {
+        keys.push(format!(r"SOFTWARE\{n}"));
+        keys.push(format!(r"SOFTWARE\ZETICA\{n}"));
+        keys.push(format!(r"SOFTWARE\ArtCraft\{n}"));
+    }
     if app.id == artcraft_launcher_core::catalog::LAUNCHER_ID {
         keys.push(r"SOFTWARE\ZETICA\Zetica Hub".to_string());
         keys.push(format!(r"SOFTWARE\{PUBLISHER}\{}", app.name));
@@ -360,7 +378,7 @@ pub mod windows {
     /// disk.
     fn candidates_in_roots(app: &CraftApp, roots: &[PathBuf]) -> Vec<PathBuf> {
         let mut out: Vec<PathBuf> = suite_folders(app, roots).iter().flat_map(|dir| exe_candidates(app, Some(dir), &[])).collect();
-        let mut dirs: Vec<PathBuf> = roots.iter().map(|root| root.join("ArtCraft")).collect();
+        let mut dirs: Vec<PathBuf> = roots.iter().flat_map(|root| [root.join("Zetica"), root.join("ArtCraft")]).collect();
         dirs.extend(roots.iter().cloned());
         out.extend(exe_candidates(app, None, &dirs));
         out

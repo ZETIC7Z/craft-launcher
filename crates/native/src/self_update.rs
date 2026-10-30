@@ -29,6 +29,20 @@ fn to_update_paths(paths: &Paths) -> craft_update::Paths {
 }
 
 fn to_update_release(release: &Release) -> craft_update::Release {
+    let mut assets = Vec::new();
+    for a in &release.assets {
+        assets.push(craft_update::Asset { name: a.name.clone(), size: a.size, url: a.url.clone(), sha256: a.sha256.clone() });
+        // Synthesize asset alias for craft_update which matches by app.id
+        if a.name.contains("zetica-hub") {
+            let direct_alias = a.name.replace("zetica-hub", "artcraft-launcher");
+            assets.push(craft_update::Asset { name: direct_alias, size: a.size, url: a.url.clone(), sha256: a.sha256.clone() });
+            let ver = release.version.as_deref().unwrap_or(env!("CARGO_PKG_VERSION"));
+            let ver_alias = a.name.replace("zetica-hub-", &format!("artcraft-launcher-{ver}-"));
+            if ver_alias != a.name {
+                assets.push(craft_update::Asset { name: ver_alias, size: a.size, url: a.url.clone(), sha256: a.sha256.clone() });
+            }
+        }
+    }
     craft_update::Release {
         tag: release.tag.clone(),
         version: release.version.clone(),
@@ -37,11 +51,7 @@ fn to_update_release(release: &Release) -> craft_update::Release {
         html_url: release.html_url.clone(),
         notes: release.notes.clone(),
         prerelease: release.prerelease,
-        assets: release
-            .assets
-            .iter()
-            .map(|a| craft_update::Asset { name: a.name.clone(), size: a.size, url: a.url.clone(), sha256: a.sha256.clone() })
-            .collect(),
+        assets,
     }
 }
 
@@ -73,6 +83,7 @@ pub fn just_updated_to(paths: &Paths, release: &Release) -> bool {
 pub fn take_failure(paths: &Paths) -> Option<String> {
     let update_paths = to_update_paths(paths);
     craft_update::self_update::take_failure(&update_paths)
+        .map(|err| err.replace("ArtCraft Launcher", "Zetica Hub"))
 }
 
 /// Downloads `release` for `platform`, puts it in place and starts the helper that relaunches

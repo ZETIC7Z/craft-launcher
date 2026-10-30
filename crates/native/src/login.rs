@@ -35,7 +35,7 @@ pub fn is_enabled() -> bool {
     #[cfg(target_os = "macos")]
     return agent().is_ok_and(|p| p.exists());
     #[cfg(windows)]
-    return windows_run().and_then(|k| k.get_value::<String, _>("ArtCraft Launcher").ok()).is_some();
+    return windows_run().and_then(|k| k.get_value::<String, _>("Zetica Hub").or_else(|_| k.get_value::<String, _>("ArtCraft Launcher")).ok()).is_some();
     #[cfg(not(any(target_os = "macos", windows)))]
     return autostart().is_ok_and(|p| p.exists());
 }
@@ -70,9 +70,11 @@ pub fn set_enabled(on: bool) -> Result<(), String> {
             .map_err(|e| format!("couldn't change the startup list ({e})"))?;
         if on {
             let value = format!("\"{}\" {HIDDEN_FLAG}", program()?.display());
-            key.set_value("ArtCraft Launcher", &value).map_err(|e| format!("couldn't change the startup list ({e})"))
+            let _ = key.delete_value("ArtCraft Launcher");
+            key.set_value("Zetica Hub", &value).map_err(|e| format!("couldn't change the startup list ({e})"))
         } else {
-            match key.delete_value("ArtCraft Launcher") {
+            let _ = key.delete_value("ArtCraft Launcher");
+            match key.delete_value("Zetica Hub") {
                 Ok(()) => Ok(()),
                 Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
                 Err(e) => Err(format!("couldn't change the startup list ({e})")),

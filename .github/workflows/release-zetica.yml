@@ -52,18 +52,21 @@ jobs:
           pwsh packaging/windows/package.ps1 -Arch x64 -SkipBuild
           Copy-Item dist/release/*-windows-x64.msi dist/release/zetica-hub-windows-x64.msi -Force
           Copy-Item dist/release/*-windows-x64-portable.zip dist/release/zetica-hub-windows-x64.zip -Force
+          Copy-Item dist/release/zetica-hub-windows-x64.msi dist/release/artcraft-launcher-windows-x64.msi -Force
+          Copy-Item dist/release/zetica-hub-windows-x64.zip dist/release/artcraft-launcher-windows-x64-portable.zip -Force
+          Get-ChildItem dist/release
 
       - name: Upload Windows MSI Artifact
         uses: actions/upload-artifact@v4
         with:
           name: zetica-hub-windows-x64-msi
-          path: dist/release/zetica-hub-windows-x64.msi
+          path: dist/release/*.msi
 
       - name: Upload Windows ZIP Artifact
         uses: actions/upload-artifact@v4
         with:
           name: zetica-hub-windows-x64-zip
-          path: dist/release/zetica-hub-windows-x64.zip
+          path: dist/release/*.zip
 
   create-release:
     name: Create GitHub Release
@@ -77,11 +80,13 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: zetica-hub-windows-x64-msi
+          path: artifacts-msi
 
       - name: Download Windows ZIP
         uses: actions/download-artifact@v4
         with:
           name: zetica-hub-windows-x64-zip
+          path: artifacts-zip
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -99,7 +104,7 @@ jobs:
             
             Developed by **Sam Pangilinan** ([zeticuz.xyz](https://www.zeticuz.xyz/)).
           files: |
-            zetica-hub-windows-x64.msi
-            zetica-hub-windows-x64.zip
+            artifacts-msi/*
+            artifacts-zip/*
           draft: false
           prerelease: false
