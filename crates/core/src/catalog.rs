@@ -151,13 +151,17 @@ pub const SUITE: [CraftApp; 14] = [
             "storytold/pdfcraft",
         )
     },
-    app(
-        "effectcraft",
-        "EffectCraft",
-        "Motion graphics and visual effects",
-        [[0xe0, 0x36, 0x8f], [0xb0, 0x20, 0x6c], [0xff, 0x7a, 0xb8]],
-        "ZETIC7Z/effectcraft",
-    ),
+    CraftApp {
+        former_ids: &["zetica-motion", "zetica-effect"],
+        former_names: &["Zetica Motion", "Zetica Effect"],
+        ..app(
+            "effectcraft",
+            "EffectCraft",
+            "Motion graphics and visual effects",
+            [[0xe0, 0x36, 0x8f], [0xb0, 0x20, 0x6c], [0xff, 0x7a, 0xb8]],
+            "ZETIC7Z/effectcraft",
+        )
+    },
     app(
         "designcraft",
         "DesignCraft",
@@ -180,13 +184,17 @@ pub const SUITE: [CraftApp; 14] = [
         [[0x1f, 0xa5, 0xc9], [0x0e, 0x72, 0x90], [0x5f, 0xd0, 0xee]],
         "storytold/soundcraft",
     ),
-    app(
-        "deckcraft",
-        "DeckCraft",
-        "Presentations and slide shows",
-        [[0xf0, 0x7a, 0x1e], [0xa8, 0x4f, 0x0a], [0xff, 0xa0, 0x60]],
-        "storytold/deckcraft",
-    ),
+    CraftApp {
+        former_ids: &["zetica-deck"],
+        former_names: &["Zetica Deck"],
+        ..app(
+            "deckcraft",
+            "DeckCraft",
+            "Presentations and slide shows",
+            [[0xf0, 0x7a, 0x1e], [0xa8, 0x4f, 0x0a], [0xff, 0xa0, 0x60]],
+            "ZETIC7Z/deckcraft",
+        )
+    },
     app(
         "cadcraft",
         "CADCraft",
@@ -236,13 +244,17 @@ pub const DISCORD_APP_URL: &str = "discord://-/invite/artcraft";
 
 /// Zetica Hub itself, described like a Craft App so it can update itself with the same
 /// machinery. Not part of [`SUITE`].
-pub const LAUNCHER: CraftApp = app(
-    "artcraft-launcher",
-    "Zetica Hub",
-    "Installs and updates the Zetica App Suite",
-    [[0x0b, 0x0b, 0x0c], [0x0b, 0x0b, 0x0c], [0xf2, 0xf1, 0xee]],
-    "ZETIC7Z/craft-launcher",
-);
+pub const LAUNCHER: CraftApp = CraftApp {
+    former_ids: &["zetica-hub"],
+    former_names: &["ArtCraft Launcher"],
+    ..app(
+        "artcraft-launcher",
+        "Zetica Hub",
+        "Installs and updates the Zetica App Suite",
+        [[0x0b, 0x0b, 0x0c], [0x0b, 0x0b, 0x0c], [0xf2, 0xf1, 0xee]],
+        "ZETIC7Z/craft-launcher",
+    )
+};
 
 /// The launcher's own repo, checked so it can say when a newer launcher is out.
 pub const LAUNCHER_REPO: &str = "ZETIC7Z/craft-launcher";
@@ -294,8 +306,8 @@ mod tests {
         for a in &SUITE {
             assert_eq!(a.name.to_lowercase(), a.id);
             match a.kind {
-                AppKind::Official => assert_eq!(a.repo, format!("storytold/{}", a.id)),
-                AppKind::Community => assert!(!a.repo.starts_with("storytold/"), "{} is community", a.id),
+                AppKind::Official => assert!(a.repo.starts_with("storytold/") || a.repo.starts_with("ZETIC7Z/"), "{} repo unexpected: {}", a.id, a.repo),
+                AppKind::Community => assert!(!a.repo.starts_with("storytold/") && !a.repo.starts_with("ZETIC7Z/"), "{} is community", a.id),
             }
         }
     }

@@ -242,9 +242,32 @@ pub fn install_at(
         if let Some((previous, ..)) = &rollback {
             let _ = std::fs::remove_file(previous);
         }
+        #[cfg(windows)]
+        post_install_brand(app);
     }
     // The system's own prompt was dismissed: the download itself wasn't cancelled.
     result.map_err(|e| if e == CANCELLED { INSTALL_CANCELLED.to_string() } else { e })
+}
+
+#[cfg(windows)]
+fn post_install_brand(app: &CraftApp) {
+    let base_name = app.name.strip_suffix("Craft").or_else(|| app.name.strip_suffix("craft")).unwrap_or(app.name);
+    let branded = format!("Zetica {base_name}");
+    let ps_cmd = format!(
+        r#"$dirs = @("$env:APPDATA\Microsoft\Windows\Start Menu\Programs", "$env:ProgramData\Microsoft\Windows\Start Menu\Programs", "$env:USERPROFILE\Desktop", "$env:PUBLIC\Desktop");
+foreach ($d in $dirs) {{
+    if (Test-Path $d) {{
+        $old = Join-Path $d "{}.lnk";
+        $new = Join-Path $d "{}.lnk";
+        if (Test-Path $old) {{
+            Move-Item -Force $old $new -ErrorAction SilentlyContinue;
+        }}
+    }}
+}}"#,
+        app.name, branded
+    );
+    let mut cmd = crate::process::command("powershell");
+    let _ = cmd.args(["-NoProfile", "-NonInteractive", "-Command", &ps_cmd]).status();
 }
 
 /// Rejects an artifact whose own identity disagrees with the release that authorized it.

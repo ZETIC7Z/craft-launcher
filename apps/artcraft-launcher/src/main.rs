@@ -506,7 +506,7 @@ impl Host for DesktopHost {
             #[cfg(target_os = "macos")]
             claim_notification_identity();
             let mut n = notify_rust::Notification::new();
-            n.summary(&title).body(&body).appname("ArtCraft Launcher");
+            n.summary(&title).body(&body).appname("Zetica Hub");
             #[cfg(windows)]
             n.app_id(APP_ID);
             #[cfg(all(unix, not(target_os = "macos")))]

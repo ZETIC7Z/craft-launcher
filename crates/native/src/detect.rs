@@ -118,7 +118,10 @@ fn suite_folders(app: &CraftApp, roots: &[PathBuf]) -> Vec<PathBuf> {
     if app.id != artcraft_launcher_core::catalog::LAUNCHER_ID {
         return Vec::new();
     }
-    roots.iter().map(|root| root.join("ArtCraft").join("Launcher")).collect()
+    roots.iter().flat_map(|root| [
+        root.join("Zetica").join("Hub"),
+        root.join("ArtCraft").join("Launcher"),
+    ]).collect()
 }
 
 /// The registry keys an MSI records its install folder in (value `InstallDir`). The launcher's package
@@ -127,6 +130,7 @@ fn suite_folders(app: &CraftApp, roots: &[PathBuf]) -> Vec<PathBuf> {
 fn install_dir_keys(app: &CraftApp) -> Vec<String> {
     let mut keys = vec![format!(r"SOFTWARE\{}", app.name)];
     if app.id == artcraft_launcher_core::catalog::LAUNCHER_ID {
+        keys.push(r"SOFTWARE\ZETICA\Zetica Hub".to_string());
         keys.push(format!(r"SOFTWARE\{PUBLISHER}\{}", app.name));
     }
     keys
@@ -994,7 +998,10 @@ mod tests {
     #[test]
     fn the_launcher_msi_installs_to_artcraft_launcher_and_the_apps_do_not() {
         let roots = roots();
-        let want: Vec<PathBuf> = roots.iter().map(|root| root.join("ArtCraft").join("Launcher")).collect();
+        let want: Vec<PathBuf> = roots.iter().flat_map(|root| [
+            root.join("Zetica").join("Hub"),
+            root.join("ArtCraft").join("Launcher"),
+        ]).collect();
         assert_eq!(suite_folders(&artcraft_launcher_core::catalog::LAUNCHER, &roots), want);
         let photo = CraftApp::by_id("photocraft").unwrap();
         assert!(suite_folders(photo, &roots).is_empty());
@@ -1004,7 +1011,7 @@ mod tests {
     fn the_launcher_records_its_folder_under_the_publisher_key() {
         assert_eq!(
             install_dir_keys(&artcraft_launcher_core::catalog::LAUNCHER),
-            [r"SOFTWARE\ArtCraft Launcher".to_string(), format!(r"SOFTWARE\{LEARNING_MACHINES}\ArtCraft Launcher")]
+            [r"SOFTWARE\Zetica Hub".to_string(), r"SOFTWARE\ZETICA\Zetica Hub".to_string(), format!(r"SOFTWARE\{LEARNING_MACHINES}\Zetica Hub")]
         );
         let photo = CraftApp::by_id("photocraft").unwrap();
         assert_eq!(install_dir_keys(photo), [r"SOFTWARE\PhotoCraft".to_string()]);

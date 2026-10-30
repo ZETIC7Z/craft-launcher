@@ -46,20 +46,20 @@ fn load_icon() -> Result<tray_icon::Icon, String> {
 /// Windows and macOS keep tray-icon's defaults: there the title is drawn next to the icon (macOS)
 /// or unsupported (Windows), and the id never reaches the user.
 fn identity(builder: TrayIconBuilder) -> TrayIconBuilder {
-    if cfg!(any(target_os = "macos", target_os = "windows")) { builder } else { builder.with_id("artcraft-launcher").with_title("ArtCraft Launcher") }
+    if cfg!(any(target_os = "macos", target_os = "windows")) { builder } else { builder.with_id("zetica-hub").with_title("Zetica Hub") }
 }
 
 impl Tray {
     /// Creates the tray icon. `wake` repaints the UI so it sees the action, even when hidden.
     /// `on_quit` runs when Quit is picked, before the UI can see it: the UI may never get to.
     pub fn new(wake: impl Fn() + Send + Sync + Clone + 'static, on_quit: impl Fn() + Send + Sync + 'static) -> Result<Self, String> {
-        let show = MenuItem::new(i18n::t("Show ArtCraft Launcher"), true, None);
+        let show = MenuItem::new(i18n::t("Show Zetica Hub"), true, None);
         let check = MenuItem::new(i18n::t("Check for Updates"), true, None);
         use artcraft_launcher_core::catalog::{GITHUB_URL, WEBSITE_URL};
-        let website = MenuItem::new(i18n::t("Visit getartcraft.com"), true, None);
-        let github = MenuItem::new(i18n::t("ArtCraft on GitHub"), true, None);
-        let discord = MenuItem::new(i18n::t("Join the ArtCraft Discord"), true, None);
-        let quit = MenuItem::new(i18n::t("Quit ArtCraft Launcher"), true, None);
+        let website = MenuItem::new(i18n::t("Visit zetica.xyz"), true, None);
+        let github = MenuItem::new(i18n::t("Zetica on GitHub"), true, None);
+        let discord = MenuItem::new(i18n::t("Join the Zetica Discord"), true, None);
+        let quit = MenuItem::new(i18n::t("Quit Zetica Hub"), true, None);
         let menu = Menu::new();
         menu.append_items(&[&show, &check, &PredefinedMenuItem::separator(), &website, &github, &discord, &PredefinedMenuItem::separator(), &quit])
             .map_err(|e| e.to_string())?;
@@ -72,7 +72,7 @@ impl Tray {
         let builder = builder.with_icon_templated(image);
         #[cfg(not(target_os = "macos"))]
         let builder = builder.with_icon(image);
-        let icon = builder.with_menu_on_left_click(cfg!(target_os = "macos")).with_tooltip("ArtCraft Launcher").build().map_err(|e| e.to_string())?;
+        let icon = builder.with_menu_on_left_click(cfg!(target_os = "macos")).with_tooltip("Zetica Hub").build().map_err(|e| e.to_string())?;
         let (tx, rx): (Sender<TrayAction>, Receiver<TrayAction>) = channel();
         let (show_id, check_id, quit_id) = (show.id().clone(), check.id().clone(), quit.id().clone());
         {
