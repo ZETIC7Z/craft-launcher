@@ -71,6 +71,9 @@ if (-not $SkipBuild) {
 }
 
 $Bin = Join-Path $TargetDir "$Target\release"
+if (-not (Test-Path (Join-Path $Bin "$Pkg.exe"))) {
+  $Bin = Join-Path $TargetDir "release"
+}
 $Exe = "$Pkg.exe"
 
 # Check the PE header before packaging. Machine (COFF header) must match -Arch, so an x64 build
