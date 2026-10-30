@@ -214,13 +214,12 @@ pub const SUITE: [CraftApp; 14] = [
     },
 ];
 
-/// ArtCraft's website.
-pub const WEBSITE_URL: &str = "https://getartcraft.com";
-/// The GitHub account every official Craft App's repository lives under. The release feed can
-/// only move an app within it; a community app installs from its own repo, pinned in [`SUITE`].
-pub const GITHUB_OWNER: &str = "storytold";
-/// ArtCraft on GitHub: every Craft App's source.
-pub const GITHUB_URL: &str = "https://github.com/storytold";
+/// Zetica's website.
+pub const WEBSITE_URL: &str = "https://zetica.xyz";
+/// The GitHub account every official Craft App's repository lives under.
+pub const GITHUB_OWNER: &str = "ZETIC7Z";
+/// Zetica on GitHub: every Craft App's source.
+pub const GITHUB_URL: &str = "https://github.com/ZETIC7Z";
 /// ArtCraft's social accounts: (service, URL). Shown as small icons, less prominent than Discord.
 pub const SOCIAL: [(&str, &str); 5] = [
     ("X", "https://x.com/get_artcraft"),
@@ -235,19 +234,18 @@ pub const DISCORD_URL: &str = "https://discord.gg/artcraft";
 /// Deep link into the Discord application for the ArtCraft server invite.
 pub const DISCORD_APP_URL: &str = "discord://-/invite/artcraft";
 
-/// ArtCraft Launcher itself, described like a Craft App so it can update itself with the same
-/// machinery (asset names `artcraft-launcher-<ver>-…`, bundle id `ai.storyteller.artcraft-launcher`,
-/// `ArtCraft Launcher.app`). Not part of [`SUITE`].
+/// Zetica Hub itself, described like a Craft App so it can update itself with the same
+/// machinery. Not part of [`SUITE`].
 pub const LAUNCHER: CraftApp = app(
     "artcraft-launcher",
-    "ArtCraft Launcher",
-    "Installs and updates the Craft App Suite",
+    "Zetica Hub",
+    "Installs and updates the Zetica App Suite",
     [[0x0b, 0x0b, 0x0c], [0x0b, 0x0b, 0x0c], [0xf2, 0xf1, 0xee]],
-    "storytold/craft-launcher",
+    "ZETIC7Z/craft-launcher",
 );
 
 /// The launcher's own repo, checked so it can say when a newer launcher is out.
-pub const LAUNCHER_REPO: &str = "storytold/craft-launcher";
+pub const LAUNCHER_REPO: &str = "ZETIC7Z/craft-launcher";
 /// The launcher's own asset stem.
 pub const LAUNCHER_ID: &str = "artcraft-launcher";
 

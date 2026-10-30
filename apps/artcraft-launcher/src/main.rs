@@ -165,7 +165,7 @@ fn native_options(hidden: bool) -> eframe::NativeOptions {
     let icon =
         eframe::icon_data::from_png_bytes(include_bytes!("../../../assets/app-icon/hicolor/256x256/apps/ai.storyteller.artcraft-launcher.png")).ok();
     let mut viewport = egui::ViewportBuilder::default()
-        .with_title("ArtCraft Launcher")
+        .with_title("Zetica Hub")
         .with_app_id(APP_ID)
         .with_inner_size([1120.0, 760.0])
         .with_min_inner_size([720.0, 500.0])

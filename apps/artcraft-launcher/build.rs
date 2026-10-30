@@ -13,12 +13,12 @@ fn main() {
     }
     let mut res = winresource::WindowsResource::new();
     res.set_icon("../../assets/app-icon/artcraft-launcher.ico")
-        .set("ProductName", "ArtCraft Launcher")
-        .set("FileDescription", "ArtCraft Launcher")
-        .set("CompanyName", "Learning Machines LLC")
-        .set("LegalCopyright", "Copyright (c) the ArtCraft Launcher authors. MIT OR Apache-2.0.")
-        .set("OriginalFilename", "artcraft-launcher.exe")
-        .set("InternalName", "artcraft-launcher");
+        .set("ProductName", "Zetica Hub")
+        .set("FileDescription", "Zetica Hub - Native Creative Suite Launcher")
+        .set("CompanyName", "ZETICA / Sam Pangilinan")
+        .set("LegalCopyright", "Copyright (c) 2026 Sam Pangilinan. All rights reserved.")
+        .set("OriginalFilename", "zetica-hub.exe")
+        .set("InternalName", "zetica-hub");
     if let Err(e) = res.compile() {
         if std::env::var_os("ARTCRAFT_LAUNCHER_REQUIRE_WINRES").is_some() {
             println!("cargo:warning=embedding Windows resources failed: {e}");

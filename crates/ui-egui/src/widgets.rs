@@ -662,24 +662,30 @@ fn icon_link(ui: &mut Ui, size: f32, link: &IconLink<'_>) {
     }
 }
 
-/// An app's name as the site sets it: Archivo, with "Craft" in the app's colour.
+/// An app's name: Archivo, with "ZETICA" in the app's accent colour and the app name in white.
 pub fn wordmark(ui: &mut Ui, app: &artcraft_launcher_core::CraftApp, size: f32) -> Response {
     wordmark_in(ui, app, size, true)
 }
 
-/// [`wordmark`], with "Craft" in the app's colour or, when `in_colour` is false, in grey.
+/// [`wordmark`], with "ZETICA" in the app's colour or, when `in_colour` is false, in grey.
 pub fn wordmark_in(ui: &mut Ui, app: &artcraft_launcher_core::CraftApp, size: f32, in_colour: bool) -> Response {
     let t = Tokens::get(ui.ctx());
-    let (prefix, craft) = app.name.strip_suffix("Craft").map_or((app.name, ""), |p| (p, "Craft"));
     let mut job = egui::text::LayoutJob::default();
     let format = |color| egui::TextFormat {
         font_id: egui::FontId::new(size, theme::display()),
         color,
-        extra_letter_spacing: -0.03 * size,
+        extra_letter_spacing: -0.02 * size,
         ..Default::default()
     };
-    job.append(prefix, 0.0, format(t.ink_strong));
-    job.append(craft, 0.0, format(if in_colour { t.app_ink(app) } else { t.muted }));
+    if app.kind == artcraft_launcher_core::AppKind::Official {
+        let app_suffix = app.name.strip_suffix("Craft").unwrap_or(app.name).to_uppercase();
+        // "ZETICA " in the app's accent colour (Pink for Effect, Green for Grid, etc.)
+        job.append("ZETICA ", 0.0, format(if in_colour { t.app_ink(app) } else { t.muted }));
+        // Specific app in white/ink strong
+        job.append(&app_suffix, 0.0, format(if in_colour { t.ink_strong } else { t.muted }));
+    } else {
+        job.append(app.name, 0.0, format(if in_colour { t.ink_strong } else { t.muted }));
+    }
     ui.add(egui::Label::new(job).selectable(false))
 }
 

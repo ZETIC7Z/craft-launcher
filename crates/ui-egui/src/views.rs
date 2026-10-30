@@ -19,11 +19,11 @@ use crate::widgets::{self, Kind};
 /// The byline that says who makes an app: "by ArtCraft" or "by <publisher>". Official apps take
 /// the accent colour, community apps the muted one.
 fn kind_badge(ui: &mut Ui, app: &artcraft_launcher_core::CraftApp, t: &Tokens) {
+    if app.kind == artcraft_launcher_core::AppKind::Official {
+        return;
+    }
     let text = fmt(tl!("by {name}"), &[("name", app.publisher)]);
-    let color = match app.kind {
-        AppKind::Official => t.accent_ink,
-        AppKind::Community => t.muted,
-    };
+    let color = t.muted;
     widgets::badge(ui, &text, color);
 }
 
@@ -92,10 +92,10 @@ impl LauncherUi {
             if bar == TitleBar::MacOs {
                 ui.add_space(TRAFFIC_LIGHTS_W);
             }
-            // The ArtCraft wordmark exactly as supplied, in its own cell.
+            // The Zetica monogram/wordmark, in its own cell.
             let logo = vec2(14.0 * crate::icons::ARTCRAFT_LOGO_ASPECT, 14.0);
             let (cell, _) = ui.allocate_exact_size(vec2(logo.x + 40.0, h), Sense::hover());
-            egui::Image::new(crate::icons::artcraft_logo(t.dark)).alt_text(tl!("ArtCraft")).paint_at(ui, Rect::from_center_size(cell.center(), logo));
+            egui::Image::new(crate::icons::artcraft_logo(t.dark)).alt_text(tl!("ZETICA")).paint_at(ui, Rect::from_center_size(cell.center(), logo));
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if bar == TitleBar::Custom {
                     widgets::window_buttons(ui, h);
@@ -105,10 +105,10 @@ impl LauncherUi {
                 }
                 // The controls reserve their actual widths before the secondary text gets space.
                 ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
-                    if ui.available_width() >= 17.0 + widgets::hud_galley(ui, tl!("Craft App Suite"), t.muted).size().x {
+                    if ui.available_width() >= 17.0 + widgets::hud_galley(ui, tl!("ZETICA APP SUITE"), t.muted).size().x {
                         widgets::rule(ui, h);
                         ui.add_space(16.0);
-                        widgets::hud(ui, tl!("Craft App Suite"), t.muted);
+                        widgets::hud(ui, tl!("ZETICA APP SUITE"), t.muted);
                     }
                 });
             });

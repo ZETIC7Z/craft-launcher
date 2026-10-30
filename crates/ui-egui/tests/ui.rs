@@ -1427,12 +1427,12 @@ fn switching_views() {
     h.get_by_label("Show apps as a table").click();
     h.run_steps(4);
     assert_eq!(h.state().as_ref().unwrap().settings.view, ViewMode::Table);
-    h.get_by_role_and_label(egui::accesskit::Role::Label, "PhotoCraft");
-    h.get_by_role_and_label(egui::accesskit::Role::Label, "WordCraft");
+    h.get_by_role_and_label(egui::accesskit::Role::Label, "ZETICA PHOTO");
+    h.get_by_role_and_label(egui::accesskit::Role::Label, "ZETICA WORD");
     // The row icon is decorative; the wordmark carries the name exactly once.
     assert_eq!(h.query_all_by_role_and_label(egui::accesskit::Role::Image, "PhotoCraft").count(), 0, "the table icon must not repeat the wordmark");
     assert_eq!(
-        h.query_all_by_role_and_label(egui::accesskit::Role::Label, "PhotoCraft").count(),
+        h.query_all_by_role_and_label(egui::accesskit::Role::Label, "ZETICA PHOTO").count(),
         1,
         "the table wordmark names PhotoCraft exactly once"
     );
@@ -2119,7 +2119,7 @@ fn clicking_a_card_opens_its_details_drawer() {
         "the hero icon is decorative; the wordmark carries the app name"
     );
     assert_eq!(
-        h.query_all_by_role_and_label(egui::accesskit::Role::Label, "PhotoCraft").count(),
+        h.query_all_by_role_and_label(egui::accesskit::Role::Label, "ZETICA PHOTO").count(),
         2,
         "exactly the grid card's wordmark and the details drawer's wordmark carry the app name"
     );
