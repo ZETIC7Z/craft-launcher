@@ -677,7 +677,7 @@ pub fn wordmark_in(ui: &mut Ui, app: &artcraft_launcher_core::CraftApp, size: f3
         extra_letter_spacing: -0.02 * size,
         ..Default::default()
     };
-    if app.kind == artcraft_launcher_core::AppKind::Official {
+    if app.kind == artcraft_launcher_core::catalog::AppKind::Official {
         let app_suffix = app.name.strip_suffix("Craft").unwrap_or(app.name).to_uppercase();
         // "ZETICA " in the app's accent colour (Pink for Effect, Green for Grid, etc.)
         job.append("ZETICA ", 0.0, format(if in_colour { t.app_ink(app) } else { t.muted }));
