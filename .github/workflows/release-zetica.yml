@@ -39,20 +39,31 @@ jobs:
       - name: Build Release Binary
         run: cargo build --release -p artcraft-launcher
 
-      - name: Package Windows Artifact
+      - name: Install WiX Toolset v5
         shell: pwsh
         run: |
-          mkdir dist
-          Copy-Item target/release/artcraft-launcher.exe dist/zetica-hub.exe
-          Copy-Item README.md dist/
-          Copy-Item LICENSE-MIT dist/
-          Compress-Archive -Path dist/* -DestinationPath zetica-hub-windows-x64.zip
+          dotnet tool install --global wix --version 5.0.2
+          wix extension add -g WixToolset.UI.wixext/5.0.2 WixToolset.Util.wixext/5.0.2
 
-      - name: Upload Windows Artifact
+      - name: Package Windows Artifacts (MSI & ZIP)
+        shell: pwsh
+        run: |
+          $env:DIST = 'dist/release'
+          pwsh packaging/windows/package.ps1 -Arch x64 -SkipBuild
+          Copy-Item dist/release/*-windows-x64.msi dist/release/zetica-hub-windows-x64.msi -Force
+          Copy-Item dist/release/*-windows-x64-portable.zip dist/release/zetica-hub-windows-x64.zip -Force
+
+      - name: Upload Windows MSI Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: zetica-hub-windows-x64
-          path: zetica-hub-windows-x64.zip
+          name: zetica-hub-windows-x64-msi
+          path: dist/release/zetica-hub-windows-x64.msi
+
+      - name: Upload Windows ZIP Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: zetica-hub-windows-x64-zip
+          path: dist/release/zetica-hub-windows-x64.zip
 
   create-release:
     name: Create GitHub Release
@@ -62,10 +73,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download Windows Artifact
+      - name: Download Windows MSI
         uses: actions/download-artifact@v4
         with:
-          name: zetica-hub-windows-x64
+          name: zetica-hub-windows-x64-msi
+
+      - name: Download Windows ZIP
+        uses: actions/download-artifact@v4
+        with:
+          name: zetica-hub-windows-x64-zip
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -78,10 +94,12 @@ jobs:
             Official native installer and hub for the ZETICA Creative Suite.
             
             ### Included Packages:
-            - `zetica-hub-windows-x64.zip`: Standalone portable binary for Windows 64-bit
+            - `zetica-hub-windows-x64.msi`: Official Windows MSI Installer with custom folder selector and desktop shortcut option.
+            - `zetica-hub-windows-x64.zip`: Standalone portable binary for Windows 64-bit.
             
             Developed by **Sam Pangilinan** ([zeticuz.xyz](https://www.zeticuz.xyz/)).
           files: |
+            zetica-hub-windows-x64.msi
             zetica-hub-windows-x64.zip
           draft: false
           prerelease: false

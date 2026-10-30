@@ -29,7 +29,7 @@ $Root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 
 # ---- app-specific values ----------------------------------------------------------------------
 $Pkg = 'artcraft-launcher'          # cargo package and binary
-$AppName = 'ArtCraft Launcher'      # display name
+$AppName = 'Zetica Hub'             # display name
 
 function Invoke-Native([string] $What, [scriptblock] $Block) {
   Write-Output "==> $What"
@@ -108,14 +108,14 @@ Copy-Item (Join-Path $Bin $Exe) $Stage
 function New-InstallerArt([string] $BannerOut, [string] $DialogOut) {
   Add-Type -AssemblyName System.Drawing
   $ink = [System.Drawing.ColorTranslator]::FromHtml('#121316')
-  $accent = [System.Drawing.ColorTranslator]::FromHtml('#2d81ff')
+  $accent = [System.Drawing.ColorTranslator]::FromHtml('#e0368f')
   $muted = [System.Drawing.Color]::FromArgb(153, 242, 241, 238)
   $line = [System.Drawing.Color]::FromArgb(38, 242, 241, 238)
   # The Craft App Suite, in the launcher's order (crates/core/src/catalog.rs).
   $apps = 'photocraft', 'vectorcraft', 'filmcraft', 'lightcraft', 'pdfcraft', 'effectcraft',
     'designcraft', 'figcraft', 'wordcraft', 'soundcraft', 'deckcraft', 'cadcraft', 'gridcraft'
   $mark = [System.Drawing.Image]::FromFile((Join-Path $Root 'assets\app-icon\hicolor\256x256\apps\ai.storyteller.artcraft-launcher.png'))
-  $wordmark = [System.Drawing.Image]::FromFile((Join-Path $Root 'docs\brand\artcraft-logo-white.png'))
+  $wordmark = [System.Drawing.Image]::FromFile((Join-Path $Root 'docs\brand\zetica-logo-white.png'))
   $icons = $apps | ForEach-Object { [System.Drawing.Image]::FromFile((Join-Path $Root "assets\app-icons\$_.png")) }
   # The site's label face; GDI+ draws a variable font at its default instance (Regular).
   $fonts = New-Object System.Drawing.Text.PrivateFontCollection
@@ -140,14 +140,15 @@ function New-InstallerArt([string] $BannerOut, [string] $DialogOut) {
         } else {
           $g.FillRectangle($panel, 0, 0, 164, 312)
           $g.FillRectangle($stripe, 162, 0, 2, 312)
-          $g.DrawImage($mark, 16, 18, 44, 44)
-          $g.DrawImage($wordmark, 22, 74, 120, [int](120 * $wordmark.Height / $wordmark.Width))
-          # "LAUNCHER" in mono capitals, spaced like the site's labels (0.15 em).
+          $g.DrawImage($mark, 20, 16, 44, 44)
+          $wm_h = [int](120 * $wordmark.Height / $wordmark.Width)
+          $g.DrawImage($wordmark, 22, 68, 120, $wm_h)
+          # "HUB" in mono capitals, spaced like the site's labels
           $brush = New-Object System.Drawing.SolidBrush $muted
           $x = 22.0
-          foreach ($ch in 'LAUNCHER'.ToCharArray()) {
-            $g.DrawString([string]$ch, $labelFont, $brush, $x, 94, [System.Drawing.StringFormat]::GenericTypographic)
-            $x += $g.MeasureString([string]$ch, $labelFont, 100, [System.Drawing.StringFormat]::GenericTypographic).Width + 1.35
+          foreach ($ch in 'HUB'.ToCharArray()) {
+            $g.DrawString([string]$ch, $labelFont, $brush, $x, 96, [System.Drawing.StringFormat]::GenericTypographic)
+            $x += $g.MeasureString([string]$ch, $labelFont, 100, [System.Drawing.StringFormat]::GenericTypographic).Width + 2.0
           }
           $brush.Dispose()
           # The apps, three to a row, in 36 px cells divided by hairlines (five rows fit above 312).
