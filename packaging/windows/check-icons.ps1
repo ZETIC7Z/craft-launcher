@@ -14,7 +14,7 @@ param(
   [string] $WxsPath = (Join-Path $PSScriptRoot 'artcraft-launcher.wxs')
 )
 $ErrorActionPreference = 'Stop'
-$AppId = 'ai.storyteller.artcraft-launcher'
+$AppIds = @('xyz.zeticuz.zetica-hub', 'ai.storyteller.artcraft-launcher')
 [xml] $Wxs = Get-Content -LiteralPath $WxsPath -Raw
 $Ns = [Xml.XmlNamespaceManager]::new($Wxs.NameTable)
 $Ns.AddNamespace('w', 'http://wixtoolset.org/schemas/v4/wxs')
@@ -31,8 +31,8 @@ foreach ($shortcut in $shortcuts) {
     throw "Shortcut '$id' must not use an MSI <Icon>: an update deletes it and pinned shortcuts go blank. Leave Icon off to use the exe's own icon."
   }
   $aumid = $shortcut.SelectSingleNode('w:ShortcutProperty[@Key="System.AppUserModel.ID"]', $Ns)
-  if (-not $aumid -or $aumid.GetAttribute('Value') -ne $AppId) {
-    throw "Shortcut '$id' must set System.AppUserModel.ID to $AppId."
+  if (-not $aumid -or $aumid.GetAttribute('Value') -notin $AppIds) {
+    throw "Shortcut '$id' must set System.AppUserModel.ID to one of $($AppIds -join ', ')."
   }
 }
 

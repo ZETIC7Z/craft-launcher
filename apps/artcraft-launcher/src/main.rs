@@ -28,7 +28,7 @@ use artcraft_launcher_ui_egui::theme::Tokens;
 use artcraft_launcher_ui_egui::{Host, LauncherUi, Settings, TitleBar};
 use eframe::wgpu::rwh::{HasDisplayHandle, RawDisplayHandle};
 
-const APP_ID: &str = "ai.storyteller.artcraft-launcher";
+const APP_ID: &str = "xyz.zeticuz.zetica-hub";
 const SETTINGS_KEY: &str = "settings";
 
 type Wake = Arc<OnceLock<Box<dyn Fn() + Send + Sync>>>;
