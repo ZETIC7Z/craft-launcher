@@ -36,7 +36,7 @@ fn to_update_release(release: &Release) -> craft_update::Release {
         if a.name.contains("zetica-hub") {
             let direct_alias = a.name.replace("zetica-hub", "artcraft-launcher");
             assets.push(craft_update::Asset { name: direct_alias, size: a.size, url: a.url.clone(), sha256: a.sha256.clone() });
-            let ver = release.version.as_deref().unwrap_or(env!("CARGO_PKG_VERSION"));
+            let ver = release.version.as_ref().map(|v| v.to_string()).unwrap_or_else(|| env!("CARGO_PKG_VERSION").to_string());
             let ver_alias = a.name.replace("zetica-hub-", &format!("artcraft-launcher-{ver}-"));
             if ver_alias != a.name {
                 assets.push(craft_update::Asset { name: ver_alias, size: a.size, url: a.url.clone(), sha256: a.sha256.clone() });
