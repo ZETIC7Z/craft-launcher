@@ -21,31 +21,31 @@
   "registry": [
     [
       "1",
-      "Software\\Learning Machines LLC\\ArtCraft Launcher",
+      "Software\\ZETICA\\Zetica Hub",
       "InstallDir",
       "[INSTALLFOLDER]"
     ],
     [
       "1",
-      "Software\\Learning Machines LLC\\ArtCraft Launcher",
+      "Software\\ZETICA\\Zetica Hub",
       "DesktopShortcutChoice",
       "[DESKTOPSHORTCUTCHOICE]"
     ],
     [
       "1",
-      "Software\\Microsoft\\Windows\\CurrentVersion\\App Paths\\artcraft-launcher.exe",
+      "Software\\Microsoft\\Windows\\CurrentVersion\\App Paths\\zetica-hub.exe",
       "",
       "[#ArtCraftLauncherExe]"
     ],
     [
       "1",
-      "Software\\Learning Machines LLC\\ArtCraft Launcher",
+      "Software\\ZETICA\\Zetica Hub",
       "StartMenuShortcut",
       "#1"
     ],
     [
       "1",
-      "Software\\Learning Machines LLC\\ArtCraft Launcher",
+      "Software\\ZETICA\\Zetica Hub",
       "DesktopShortcut",
       "#1"
     ]
