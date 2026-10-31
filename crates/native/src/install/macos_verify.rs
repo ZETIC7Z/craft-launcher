@@ -1,7 +1,9 @@
 //! Read-only checks on the private copy, before the installer swaps it into place.
 //!
-//! These establish signature integrity, pinned identity, notarization and macOS policy
-//! acceptance at check time. They do not promise a fresh OCSP response for every certificate.
+//! These establish signature integrity, pinned identity and notarization at check time. When
+//! macOS assessments are enabled, they also require policy acceptance. A global assessment disable
+//! is a user choice; it skips only that final policy check. These checks do not promise a fresh
+//! OCSP response for every certificate.
 
 use std::path::Path;
 use std::time::Duration;
@@ -24,18 +26,44 @@ pub(super) fn verify_with(
         // Do not apply the outer app's team or identifier requirement to its nested code.
         ("signature integrity", CODESIGN, vec!["--verify", "--all-architectures", "--deep", "--strict", path]),
         ("developer identity", CODESIGN, vec!["--verify", "--all-architectures", "--strict", "-R", &requirement, path]),
-        ("notarization", CODESIGN, vec!["--verify", "--check-notarization", path]),
-        // Ignore existing assessment objects AND avoid storing this assessment. This does not
-        // bypass trust/revocation caches or prove a fresh OCSP response.
-        ("macOS policy", SPCTL, vec!["--assess", "--type", "execute", "--ignore-cache", "--no-cache", "--raw", path]),
+        // `--check-notarization` looks for a ticket; the explicit requirement makes a positive
+        // notarized result part of verification too (Apple DTS: codesign -R="notarized").
+        ("notarization", CODESIGN, vec!["--verify", "--check-notarization", "-R=notarized", path]),
     ] {
-        let output = run(program, &args, TIMEOUT)
+        run(program, &args, TIMEOUT)
             .map_err(|reason| format!("macOS verification did not succeed ({check}: {reason}), so the app wasn't installed"))?;
-        if program == SPCTL && !assessment_accepted(&output) {
-            return Err("macOS didn't return an affirmative policy assessment, so the app wasn't installed".into());
-        }
+    }
+
+    // This documented, read-only query distinguishes a user's global disable from an assessment
+    // override on a particular app. Never infer that preference from the raw assessment result.
+    let status = run(SPCTL, &["--status"], TIMEOUT)
+        .map_err(|reason| format!("couldn't determine Gatekeeper status ({reason}), so the app wasn't installed"))?;
+    if assessment_status(&status)? == AssessmentStatus::Disabled {
+        return Ok(());
+    }
+
+    // Ignore existing assessment objects AND avoid storing this assessment. This does not
+    // bypass trust/revocation caches or prove a fresh OCSP response.
+    let output = run(SPCTL, &["--assess", "--type", "execute", "--ignore-cache", "--no-cache", "--raw", path], TIMEOUT)
+        .map_err(|reason| format!("macOS verification did not succeed (macOS policy: {reason}), so the app wasn't installed"))?;
+    if !assessment_accepted(&output) {
+        return Err("macOS didn't return an affirmative policy assessment, so the app wasn't installed".into());
     }
     Ok(())
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum AssessmentStatus {
+    Enabled,
+    Disabled,
+}
+
+fn assessment_status(output: &str) -> Result<AssessmentStatus, String> {
+    match output.trim() {
+        "assessments enabled" => Ok(AssessmentStatus::Enabled),
+        "assessments disabled" => Ok(AssessmentStatus::Disabled),
+        _ => Err("macOS returned an unknown Gatekeeper status, so the app wasn't installed".into()),
+    }
 }
 
 fn identity_requirement(app: &CraftApp, team: &str) -> Result<String, String> {
@@ -125,10 +153,16 @@ mod tests {
         verify_with(app, Path::new("/private/owned/SolidCraft.app"), app.mac_team.unwrap(), |program, args, timeout| {
             assert_eq!(timeout, Duration::from_secs(60));
             calls.push((program.to_string(), args.iter().map(|s| s.to_string()).collect::<Vec<_>>()));
-            Ok(if program == SPCTL { accepted() } else { String::new() })
+            Ok(if program == SPCTL && args == ["--status"] {
+                "assessments enabled".into()
+            } else if program == SPCTL {
+                accepted()
+            } else {
+                String::new()
+            })
         })
         .unwrap();
-        assert_eq!(calls.len(), 4);
+        assert_eq!(calls.len(), 5);
         let integrity = &calls[0].1;
         assert!(integrity.iter().any(|a| a == "--all-architectures"));
         assert!(integrity.iter().any(|a| a == "--deep"));
@@ -138,10 +172,80 @@ mod tests {
         assert!(!identity.iter().any(|a| a == "--deep"));
         assert!(identity.iter().any(|a| a == "--all-architectures"));
         assert!(identity.iter().any(|a| a.contains("G5QA5U5X2S") && a.contains("io.tangencylabs.solidcraft")));
-        assert_eq!(calls[2].1, ["--verify", "--check-notarization", "/private/owned/SolidCraft.app"]);
+        assert_eq!(calls[2].1, ["--verify", "--check-notarization", "-R=notarized", "/private/owned/SolidCraft.app"]);
+        assert_eq!(calls[3].1, ["--status"]);
         for flag in ["--ignore-cache", "--no-cache", "--raw"] {
-            assert!(calls[3].1.iter().any(|a| a == flag));
+            assert!(calls[4].1.iter().any(|a| a == flag));
         }
+    }
+
+    #[test]
+    fn mac_install_respects_disabled_assessments_after_all_independent_checks() {
+        let app = solidcraft();
+        let mut calls = Vec::new();
+        verify_with(app, Path::new("/private/owned/SolidCraft.app"), app.mac_team.unwrap(), |program, args, timeout| {
+            assert_eq!(timeout, TIMEOUT);
+            calls.push((program.to_string(), args.iter().map(|s| s.to_string()).collect::<Vec<_>>()));
+            Ok(if program == SPCTL { "assessments disabled".into() } else { String::new() })
+        })
+        .unwrap();
+        assert_eq!(calls.len(), 4);
+        assert!(calls[..3].iter().all(|(program, _)| program == CODESIGN));
+        assert_eq!(calls[2].1, ["--verify", "--check-notarization", "-R=notarized", "/private/owned/SolidCraft.app"]);
+        assert_eq!(calls[3], (SPCTL.into(), vec!["--status".into()]));
+    }
+
+    #[test]
+    fn mac_install_with_disabled_assessments_still_rejects_tampering_wrong_identity_and_missing_notarization() {
+        let app = solidcraft();
+        for (failed_call, reason) in [
+            (0, "signature integrity failed"),
+            (1, "developer identity requirement failed"),
+            (2, "notarized requirement failed"),
+            (2, "notarization service unavailable"),
+        ] {
+            let mut calls = 0;
+            let error = verify_with(app, Path::new("/private/owned/SolidCraft.app"), "G5QA5U5X2S", |program, args, _| {
+                let call = calls;
+                calls += 1;
+                if call == failed_call {
+                    Err(reason.into())
+                } else if program == SPCTL && args == ["--status"] {
+                    Ok("assessments disabled".into())
+                } else {
+                    Ok(String::new())
+                }
+            })
+            .unwrap_err();
+            assert!(error.contains(reason), "{error}");
+            assert!(error.contains("wasn't installed"), "{error}");
+            assert_eq!(calls, failed_call + 1);
+        }
+    }
+
+    #[test]
+    fn mac_install_fails_closed_on_unknown_or_unavailable_assessment_status() {
+        let app = solidcraft();
+        for output in ["", "disabled", "assessments disabled plus other output", "<plist/>"] {
+            let mut calls = 0;
+            let error = verify_with(app, Path::new("/private/owned/SolidCraft.app"), "G5QA5U5X2S", |program, args, _| {
+                calls += 1;
+                Ok(if program == SPCTL && args == ["--status"] { output.into() } else { String::new() })
+            })
+            .unwrap_err();
+            assert!(error.contains("unknown Gatekeeper status"), "{error}");
+            assert_eq!(calls, 4);
+        }
+
+        let mut calls = 0;
+        let error = verify_with(app, Path::new("/private/owned/SolidCraft.app"), "G5QA5U5X2S", |program, args, _| {
+            calls += 1;
+            if program == SPCTL && args == ["--status"] { Err("helper unavailable".into()) } else { Ok(String::new()) }
+        })
+        .unwrap_err();
+        assert!(error.contains("couldn't determine Gatekeeper status"), "{error}");
+        assert!(error.contains("helper unavailable"), "{error}");
+        assert_eq!(calls, 4);
     }
 
     #[test]
@@ -171,6 +275,7 @@ mod tests {
             accepted().replace("<true/>", "<false/>"),
             accepted().replace("<true/>", "<string>true</string>"),
             accepted().replace("<key>assessment:authority</key>", "<key>other</key>"),
+            accepted().replace("<key>assessment:authority</key>", "<key>assessment:override</key><true/><key>assessment:authority</key>"),
             accepted().replace(
                 "<key>assessment:authority:source</key>",
                 "<key>assessment:authority:override</key><true/><key>assessment:authority:source</key>",
@@ -186,13 +291,28 @@ mod tests {
 
     #[test]
     fn mac_install_tool_errors_stop_the_pipeline_without_blame_or_success() {
-        for failed in 0..4 {
-            for reason in ["couldn't start helper", "didn't finish within 60 seconds", "invalid strict option", "revoked", "requirement failed"] {
+        for failed in 0..5 {
+            for reason in [
+                "couldn't start helper",
+                "didn't finish within 60 seconds",
+                "invalid strict option",
+                "revoked",
+                "requirement failed",
+                "network unavailable",
+            ] {
                 let mut count = 0;
-                let error = verify_with(solidcraft(), Path::new("/private/owned/SolidCraft.app"), "G5QA5U5X2S", |_, _, _| {
+                let error = verify_with(solidcraft(), Path::new("/private/owned/SolidCraft.app"), "G5QA5U5X2S", |program, args, _| {
                     let call = count;
                     count += 1;
-                    if call == failed { Err(reason.into()) } else { Ok(String::new()) }
+                    if call == failed {
+                        Err(reason.into())
+                    } else if program == SPCTL && args == ["--status"] {
+                        Ok("assessments enabled".into())
+                    } else if program == SPCTL {
+                        Ok(accepted())
+                    } else {
+                        Ok(String::new())
+                    }
                 })
                 .unwrap_err();
                 assert_eq!(count, failed + 1);
@@ -219,12 +339,20 @@ mod tests {
         let found = Installed { version: None, source: InstallSource::MacApp, location: staged.display().to_string(), package: None };
         let expect = Expect { team: app.mac_team, version: None };
         // Injected tool outcomes exercise the real pre-swap boundary, not real signatures.
-        for failed in 0..4 {
+        for failed in 0..5 {
             let mut count = 0;
-            let result = check_and_swap(app, &staged, &old, &found, &expect, |_, _, _| {
+            let result = check_and_swap(app, &staged, &old, &found, &expect, |program, args, _| {
                 let call = count;
                 count += 1;
-                if call == failed { Err("check unavailable or denied".into()) } else { Ok(String::new()) }
+                if call == failed {
+                    Err("check unavailable or denied".into())
+                } else if program == SPCTL && args == ["--status"] {
+                    Ok("assessments enabled".into())
+                } else if program == SPCTL {
+                    Ok(accepted())
+                } else {
+                    Ok(String::new())
+                }
             });
             assert!(result.is_err());
             assert_eq!(count, failed + 1);
@@ -235,8 +363,14 @@ mod tests {
         }
         // Exit zero with missing/malformed/negative raw policy data is still a refusal.
         for output in [String::new(), "not a plist".into(), accepted().replace("<true/>", "<false/>")] {
-            let result = check_and_swap(app, &staged, &old, &found, &expect, |program, _, _| {
-                Ok(if program == SPCTL { output.clone() } else { String::new() })
+            let result = check_and_swap(app, &staged, &old, &found, &expect, |program, args, _| {
+                Ok(if program == SPCTL && args == ["--status"] {
+                    "assessments enabled".into()
+                } else if program == SPCTL {
+                    output.clone()
+                } else {
+                    String::new()
+                })
             });
             assert!(result.is_err());
             assert_eq!(std::fs::read(&old).unwrap(), b"old fixture bytes");
@@ -245,9 +379,77 @@ mod tests {
     }
 
     #[test]
+    fn disabled_assessments_allow_only_the_verified_staged_copy_to_swap() {
+        use crate::install::macos::{Expect, check_and_swap};
+        use artcraft_launcher_core::{InstallSource, Installed};
+
+        let app = solidcraft();
+        let dir = tempfile::tempdir().unwrap();
+        let staged = dir.path().join("new.app");
+        let old = dir.path().join("old.app");
+        std::fs::write(&staged, b"new fixture bytes").unwrap();
+        std::fs::write(&old, b"old fixture bytes").unwrap();
+        let found = Installed { version: None, source: InstallSource::MacApp, location: staged.display().to_string(), package: None };
+        let expect = Expect { team: app.mac_team, version: None };
+        let mut calls = Vec::new();
+
+        check_and_swap(app, &staged, &old, &found, &expect, |program, args, _| {
+            calls.push((program.to_string(), args.iter().map(|s| s.to_string()).collect::<Vec<_>>()));
+            Ok(if program == SPCTL { "assessments disabled".into() } else { String::new() })
+        })
+        .unwrap();
+
+        assert_eq!(calls.len(), 4);
+        assert_eq!(calls[3], (SPCTL.into(), vec!["--status".into()]));
+        assert_eq!(std::fs::read(&old).unwrap(), b"new fixture bytes");
+        assert!(!staged.exists());
+    }
+
+    #[test]
     #[ignore = "needs the independently staged real release; no app execution or swap"]
     fn mac_install_real_release_passes_the_production_verifier() {
         let bundle = std::env::var_os("ARTCRAFT_LAUNCHER_TEST_STAGED_APP").expect("set the owned staged release path");
         verify_with(solidcraft(), Path::new(&bundle), "G5QA5U5X2S", crate::process::run).unwrap();
+    }
+
+    #[test]
+    #[ignore = "needs a staged signed/notarized release; simulates disabled status without changing host settings"]
+    fn mac_install_real_release_keeps_its_own_checks_when_assessments_are_disabled() {
+        use crate::install::macos::{Expect, check_and_swap};
+        use artcraft_launcher_core::{InstallSource, Installed, version::Version};
+
+        let source = std::path::PathBuf::from(std::env::var_os("ARTCRAFT_LAUNCHER_TEST_STAGED_APP").expect("set the owned staged release path"));
+        let dir = tempfile::tempdir().unwrap();
+        let staged_dir = dir.path().join("staged");
+        let destination_dir = dir.path().join("Applications");
+        std::fs::create_dir_all(&staged_dir).unwrap();
+        std::fs::create_dir_all(&destination_dir).unwrap();
+        let staged = staged_dir.join("SolidCraft.app");
+        crate::process::run(
+            "/usr/bin/ditto",
+            &["--norsrc", "--noextattr", "--noacl", source.to_str().unwrap(), staged.to_str().unwrap()],
+            Duration::from_secs(600),
+        )
+        .unwrap();
+
+        let app = solidcraft();
+        let destination = destination_dir.join("SolidCraft.app");
+        let version = Version::new(0, 28, 0);
+        let found =
+            Installed { version: Some(version.clone()), source: InstallSource::MacApp, location: staged.display().to_string(), package: None };
+        let expect = Expect { team: app.mac_team, version: Some(&version) };
+        check_and_swap(app, &staged, &destination, &found, &expect, |program, args, timeout| {
+            if program == SPCTL && args == ["--status"] {
+                Ok("assessments disabled".into())
+            } else if program == SPCTL {
+                Err("policy assessment should be skipped when disabled".into())
+            } else {
+                crate::process::run(program, args, timeout)
+            }
+        })
+        .unwrap();
+
+        assert!(destination.is_dir());
+        assert!(!staged.exists());
     }
 }
