@@ -25,6 +25,7 @@ jobs:
       app-name: craft-launcher
       app-title: ArtCraft Launcher
       version: ${{ inputs.version }}
+      launcher-qualification: true
     secrets:
       APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
       APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
