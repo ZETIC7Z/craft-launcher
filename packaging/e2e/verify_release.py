@@ -5,7 +5,7 @@ import argparse
 import json
 from pathlib import Path
 
-from contract import TARGETS, artifact_names, digest, operations, require, self_update_artifact
+from contract import BINARY_ARCHES, TARGETS, artifact_names, digest, operations, require, self_update_artifact
 
 
 def verify(artifacts, reports, version, sha, run_id):
@@ -28,14 +28,33 @@ def verify(artifacts, reports, version, sha, run_id):
         require(set(report.get("lifecycles", {})) == set(expected_kinds), f"{target} has missing lifecycle formats")
         for kind in expected_kinds:
             require(report["lifecycles"][kind] == operations(kind), f"{target}/{kind} skipped or reordered a required operation")
+            for index, operation in enumerate(operations(kind)):
+                native_path = path.parent / f"{kind}-{index:02d}-{operation}.json"
+                require(native_path.is_file(), f"{target}/{kind} missing native result: {operation}")
+                native = json.loads(native_path.read_text())
+                require(native.get("schema") == 1 and native.get("success") is True and
+                        (native.get("operation"), native.get("launcher_version"), native.get("build_sha"), native.get("binary_arch")) ==
+                        (operation, version, sha, BINARY_ARCHES[target]), f"{target}/{kind} invalid native result: {operation}")
         require(set(report.get("ui", [])) == {f"launcher-e2e-{kind}" for kind in expected_kinds if kind != "deb"},
                 f"{target} has missing GUI startup proof")
+        for root in report["ui"]:
+            for attempt in range(2):
+                gui_path = path.parent / f"gui-{root}-{attempt}.json"
+                require(gui_path.is_file(), f"{target} missing GUI result: {root}/{attempt}")
+                gui = json.loads(gui_path.read_text())
+                require(gui.get("schema") == 1 and gui.get("ui_frames", 0) >= 3, f"{target} missing GUI frames")
         update = report.get("self_update", {})
         require(update.get("from_version") == "0.9.0" and update.get("to_version") == version and
                 update.get("replaced") is True and update.get("restarted") is True and update.get("data_preserved") is True,
                 f"{target} has no successful self-update/restart proof")
         require(update.get("candidate") == self_update_artifact(version, target) and update.get("sha256") == report["artifacts"][update["candidate"]],
                 f"{target} self-update used another candidate")
+        update_path = path.parent / "self-update-native.json"
+        require(update_path.is_file(), f"{target} missing native self-update result")
+        native_update = json.loads(update_path.read_text())
+        require(native_update.get("schema") == 1 and native_update.get("scheduled") is True and
+                (native_update.get("source_sha"), native_update.get("from_version"), native_update.get("to_version"), native_update.get("candidate_sha256")) ==
+                (sha, "0.9.0", version, update["sha256"]), f"{target} invalid native self-update result")
         if target.startswith("macos-"):
             require(report.get("gatekeeper") == "assessments enabled", "standard macOS gate requires enabled policy")
         found[target] = report

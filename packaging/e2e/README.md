@@ -21,6 +21,12 @@ jobs. Seven standard hosted runners exercise native architectures; Windows x86 r
 The candidate version must match the workspace version compiled into the binary. A packaging-only
 version override that relabels different binary contents intentionally fails qualification.
 
+Manual dispatch defaults to `create-draft: false`: it builds, qualifies and retains evidence but
+does not create/edit a GitHub release or tag. The read-only `verify` job still compares the
+candidate bytes and all reports in this mode. A deliberate release-branch push or explicit
+`create-draft: true` dispatch permits draft creation only after the same checks succeed. Nothing
+in this suite publishes a draft. Do not use a release-branch push to stage a qualification-only run.
+
 | Runner target | Launcher packages installed, executed, removed | App lifecycle formats |
 | --- | --- | --- |
 | macOS ARM64, x64 | DMG → copied `.app` | DMG |
@@ -39,7 +45,9 @@ Each app operation starts a new installed-launcher process. It reads persisted i
 records and detects the actual installation again. The flow includes:
 
 - Fresh launcher installation, version and build-SHA/architecture checks, native GUI initialization
-  and multiple UI frames, close and reopen, launcher removal and platform registration checks.
+  and multiple UI passes, close and reopen, launcher removal and platform registration checks.
+  macOS preserves the package's copy metadata, checks codesign/stapler and, when enabled, performs
+  a real Gatekeeper assessment of the installed launcher bundle.
 - FigCraft 0.12.1 installation, executable version probing, cancellation with partial-file removal,
   real checksum rejection before the OS installer, pause/resume, update to 0.13.1 and persisted detection.
 - Older-version rejection, corrupt cached-artifact recovery, same-version reinstall, app launch,
@@ -66,6 +74,9 @@ computer. System DEBs and MSI registrations, macOS Launch Services, and Windows 
 require a truly disposable runner account/VM in addition to temporary homes and destinations.
 Launch Services can give the started app the runner account's actual home; the VM is the isolation
 boundary in that case. Cleanup uses the real uninstall path; failed cleanup fails qualification.
+The external runner also checks a surviving process at the exact installed app executable path;
+production's running-app detection alone is not the launch evidence. Process inventories stay
+in memory and are not included in uploaded logs.
 
 ## Release gate and artifact identity
 
@@ -73,7 +84,9 @@ The shared `release.yml` waits for the entire qualification matrix to **succeed*
 draft job runs. Failure, cancellation and a skipped qualification job cannot satisfy the gate.
 The draft action downloads the same run's evidence and, before any GitHub release mutation,
 executes `verify_release.py`. It requires every target and every ordered lifecycle step, cleanup,
-GUI startup and self-update evidence. Reports must match the current commit, run ID and version,
+GUI startup and self-update evidence, including each saved native operation result, both GUI-start
+records per applicable format and the native updater's scheduling result. A green summary with
+missing or inconsistent underlying results fails. Reports must match the current commit, run ID and version,
 and their SHA-256 hashes must match the exact files being uploaded. No rebuild or artifact
 replacement is permitted between qualification and upload. `launcher-qualification.json` is
 included with the release assets so the evidence and limits travel with the candidate.
@@ -83,6 +96,22 @@ failing comparison rather than relying on the download action alone. See
 [GitHub's artifact documentation](https://docs.github.com/en/actions/tutorials/store-and-share-data).
 This gates this repository's workflow. It cannot stop a maintainer manually publishing an
 unqualified release through the UI/API; no repository protections or access settings are changed.
+These reports are assertions by trusted repository code running in Actions, not cryptographic
+attestations against a malicious workflow or malicious source commit. The gate protects against
+missing, failed, stale, inconsistent or replaced candidates under that trust model.
+
+## Staging order
+
+1. Review and land the opt-in shared-workflow interfaces in `craft-common-actions`. Existing app
+   callers retain their defaults; no launcher qualification is activated by that change alone.
+2. Integrate the separate verifier hotfix and this launcher branch, resolving any version/base
+   drift. The shared interfaces must already exist because this repository follows shared `@main`.
+3. After authorization, manually dispatch the launcher workflow on the exact reviewed commit with
+   `create-draft: false`. Inspect all seven jobs and `launcher-candidate-evidence`; missing or failed
+   jobs are blockers. No hosted execution has been established by local contract tests.
+4. After successful staging, an authorized release-branch push or explicit draft-enabled run
+   builds and qualifies its own candidate once, then uploads those exact bytes. Evidence from the
+   staging run cannot qualify a rebuild or a different run. Cross-run promotion is not implemented.
 
 ## Fixtures
 
@@ -129,6 +158,14 @@ shellcheck packaging/*.sh packaging/*/*.sh packaging/linux/AppRun
 The Python tests test the evidence gate; synthetic reports in those unit tests are **not** OS
 installation evidence. A hosted candidate run is still required after integration. This suite
 reduces regression risk; it cannot ensure the launcher is perfect.
+
+The native tests establish fixture selection and local path/activation invariants. Positive
+installer/launch claims come only from `runner.py` executing the installed candidate on the target
+OS. Negative checksum data, deliberate cache corruption and pause/cancel requests are controlled
+fault injection through production code, not substitutes for positive installation. The updater's
+candidate release metadata/cache is constructed by the harness; discovery and fresh updater
+transfer are not exercised. Data sentinels prove file preservation, not that the UI reloads every
+setting. GUI callbacks prove native startup, not pixel correctness or full UI interaction.
 
 Remaining coverage boundaries are explicit in every release evidence summary: full accessibility
 or pointer-driven UI install/update dialogs, updater release discovery/fresh network transfer,

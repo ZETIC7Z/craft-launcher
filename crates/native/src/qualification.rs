@@ -89,7 +89,11 @@ fn require_runner() -> Result<(), String> {
 pub fn ui_report(root: &Path) -> Result<PathBuf, String> {
     require_runner()?;
     let root = checked_root(root)?;
-    if !std::fs::read_to_string(root.join("owner.txt")).map_err(|e| e.to_string())?.starts_with(MARKER) {
+    let marker = std::fs::read_to_string(root.join("owner.txt")).map_err(|e| e.to_string())?;
+    if ![PackageKind::Dmg, PackageKind::Msi, PackageKind::PortableZip, PackageKind::Deb, PackageKind::AppImage]
+        .iter()
+        .any(|kind| marker == format!("{MARKER}\n{kind:?}\n"))
+    {
         return Err("initialize qualification before launching its UI".into());
     }
     Ok(root.join("ui.json"))
@@ -108,9 +112,23 @@ fn parse_kind(kind: &str) -> Result<PackageKind, String> {
 
 fn checked_root(root: &Path) -> Result<PathBuf, String> {
     let temp = std::env::var_os("RUNNER_TEMP").ok_or("RUNNER_TEMP is missing")?;
-    let temp = std::fs::canonicalize(temp).map_err(|e| e.to_string())?;
+    checked_root_under(root, Path::new(&temp))
+}
+
+// Keep Windows paths in the normal namespace: MSI and OS process inventory can disagree with
+// verbatim \\?\ paths even when they name the same file. Existing symlinks/junctions still resolve.
+fn canonical(path: &Path) -> Result<PathBuf, String> {
+    #[cfg(windows)]
+    let result = dunce::canonicalize(path);
+    #[cfg(not(windows))]
+    let result = std::fs::canonicalize(path);
+    result.map_err(|e| e.to_string())
+}
+
+fn checked_root_under(root: &Path, temp: &Path) -> Result<PathBuf, String> {
+    let temp = canonical(temp)?;
     let parent = root.parent().ok_or("qualification directory needs a parent")?;
-    let parent = std::fs::canonicalize(parent).map_err(|e| e.to_string())?;
+    let parent = canonical(parent)?;
     let name = root
         .file_name()
         .and_then(|n| n.to_str())
@@ -160,12 +178,12 @@ fn verify(app: &CraftApp, paths: &Paths, want: Option<&str>) -> Result<(), Strin
 
 fn assert_owned(root: &Path, kind: PackageKind, found: Option<&Installed>, manifest: &Manifest) -> Result<(), String> {
     for record in manifest.apps.values() {
-        if !std::fs::canonicalize(&record.path).map_err(|e| e.to_string())?.starts_with(root) {
+        if !canonical(&record.path)?.starts_with(root) {
             return Err("qualification record escapes its root".into());
         }
     }
     if let Some(found) = found {
-        let path = std::fs::canonicalize(&found.location).map_err(|e| e.to_string())?;
+        let path = canonical(Path::new(&found.location))?;
         if kind != PackageKind::Deb && !path.starts_with(root) {
             return Err("detected installation escapes qualification root".into());
         }
@@ -330,5 +348,27 @@ mod tests {
     fn qualification_is_not_an_implicit_workstation_install() {
         assert!(run(&[]).is_err());
         assert!(parse_kind("untrusted-package").is_err());
+    }
+
+    #[test]
+    fn qualification_root_rejects_escape_and_requires_an_explicit_name() {
+        let temp = tempfile::tempdir().unwrap();
+        let owned = temp.path().join("owned");
+        std::fs::create_dir(&owned).unwrap();
+        let root = owned.join("launcher-e2e-test");
+        assert_eq!(checked_root_under(&root, temp.path()).unwrap(), canonical(&owned).unwrap().join("launcher-e2e-test"));
+        assert!(checked_root_under(&owned.join("unmarked"), temp.path()).is_err());
+        assert!(checked_root_under(&temp.path().join("launcher-e2e-escape"), &owned).is_err());
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn qualification_root_rejects_symlinked_root_and_escaping_parent() {
+        let temp = tempfile::tempdir().unwrap();
+        let elsewhere = tempfile::tempdir().unwrap();
+        let root = temp.path().join("launcher-e2e-link");
+        std::os::unix::fs::symlink(elsewhere.path(), &root).unwrap();
+        assert!(checked_root_under(&root, temp.path()).is_err());
+        assert!(checked_root_under(&root.join("launcher-e2e-child"), temp.path()).is_err());
     }
 }

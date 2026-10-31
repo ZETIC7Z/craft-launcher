@@ -13,6 +13,11 @@ TARGETS = {
     "linux-aarch64": ("linux-aarch64", ["deb", "AppImage", "tar.gz"], ["deb", "appimage"]),
 }
 
+BINARY_ARCHES = {
+    "macos-arm64": "aarch64", "macos-x64": "x86_64", "windows-x64": "x86_64", "windows-x86": "x86",
+    "windows-arm64": "aarch64", "linux-x86_64": "x86_64", "linux-aarch64": "aarch64",
+}
+
 OPERATIONS = [
     "init", "verify-absent", "install-old", "verify-old", "cancel-new", "verify-old",
     "bad-checksum", "verify-old", "pause-new", "install-new", "verify-new",

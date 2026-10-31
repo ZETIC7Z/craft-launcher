@@ -21,7 +21,7 @@ import traceback
 import urllib.request
 import zipfile
 
-from contract import TARGETS, artifact_names, digest, operations, require
+from contract import BINARY_ARCHES, TARGETS, artifact_names, digest, operations, require
 
 
 class Runner:
@@ -51,7 +51,7 @@ class Runner:
                            run_id=os.environ["GITHUB_RUN_ID"], version=args.version,
                            runner_arch=platform.machine(), success=False, artifacts={}, lifecycles={}, packages={})
 
-    def command(self, argv, *, env=None, timeout=600, allowed=(0,)):
+    def command(self, argv, *, env=None, timeout=600, allowed=(0,), record_output=True):
         argv = [str(a) for a in argv]
         self.commands += 1
         label = f"{self.commands:03d}-{Path(argv[0]).name}"
@@ -61,10 +61,11 @@ class Runner:
             result = subprocess.run(argv, env=env or self.env, cwd=self.work,
                                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=timeout)
         except subprocess.TimeoutExpired as exc:
-            (self.output / f"{label}.log").write_bytes(exc.stdout or b"")
+            (self.output / f"{label}.log").write_bytes((exc.stdout or b"") if record_output else b"process inventory omitted\n")
             raise RuntimeError(f"{label} timed out after {timeout}s") from exc
-        (self.output / f"{label}.log").write_bytes(result.stdout)
-        require(result.returncode in allowed, f"{label} exited {result.returncode}: {result.stdout[-4000:].decode(errors='replace')}")
+        (self.output / f"{label}.log").write_bytes(result.stdout if record_output else b"process inventory omitted\n")
+        detail = result.stdout[-4000:].decode(errors="replace") if record_output else "process inventory omitted"
+        require(result.returncode in allowed, f"{label} exited {result.returncode}: {detail}")
         return result.stdout.decode(errors="replace")
 
     def executable(self, directory, name="artcraft-launcher.exe"):
@@ -84,12 +85,14 @@ class Runner:
                 self.command(["hdiutil", "attach", "-readonly", "-nobrowse", "-noautoopen", "-mountpoint", mount, artifact])
                 attached = True
                 bundle = folder / "ArtCraft Launcher.app"
-                self.command(["ditto", "--norsrc", "--noextattr", "--noacl", mount / bundle.name, bundle])
+                self.command(["ditto", mount / bundle.name, bundle])
             finally:
                 if attached:
                     self.command(["hdiutil", "detach", mount])
             self.command(["codesign", "--verify", "--deep", "--strict", bundle])
             self.command(["xcrun", "stapler", "validate", bundle])
+            if self.args.gatekeeper == "enabled":
+                self.command(["/usr/sbin/spctl", "--assess", "--type", "execute", bundle])
             try:
                 yield bundle / "Contents/MacOS/ArtCraft Launcher"
             finally:
@@ -190,17 +193,19 @@ class Runner:
         require(result["success"] and result["operation"] == operation and result["launcher_version"] == self.args.version,
                 f"wrong qualification result: {result}")
         require(result["build_sha"] == os.environ["GITHUB_SHA"], "installed launcher was built from another source revision")
-        expected_arch = {"macos-arm64": "aarch64", "macos-x64": "x86_64", "windows-x64": "x86_64", "windows-x86": "x86",
-                         "windows-arm64": "aarch64", "linux-x86_64": "x86_64", "linux-aarch64": "aarch64"}[self.args.target]
-        require(result["binary_arch"] == expected_arch, "wrong architecture executed (possibly emulated)")
+        require(result["binary_arch"] == BINARY_ARCHES[self.args.target], "wrong architecture executed (possibly emulated)")
         return result
 
-    def probe_app(self, result):
-        installed = result["installed"]
+    @staticmethod
+    def app_executable(installed):
         path = Path(installed["location"])
         if path.suffix == ".app":
             info = plistlib.loads((path / "Contents/Info.plist").read_bytes())
             path = path / "Contents/MacOS" / info["CFBundleExecutable"]
+        return path
+
+    def probe_app(self, result):
+        path = self.app_executable(result["installed"])
         output = self.command([path, "--version"], timeout=60)
         # The executable, not just a manifest or registry row, must report the version.
         version = "0.13.1" if result["operation"] == "verify-new" else "0.12.1"
@@ -212,10 +217,7 @@ class Runner:
         This is test teardown, not a claim that the launcher has a stop-app feature. Descendants
         of an AppImage runtime are included so its extracted process cannot outlive the test.
         """
-        path = Path(installed["location"])
-        if path.suffix == ".app":
-            info = plistlib.loads((path / "Contents/Info.plist").read_bytes())
-            path = path / "Contents/MacOS" / info["CFBundleExecutable"]
+        path = self.app_executable(installed)
         if platform.system() == "Windows":
             env = dict(self.env, QUALIFIED_APP_EXE=str(path))
             self.command(["powershell", "-NoProfile", "-NonInteractive", "-Command",
@@ -223,7 +225,8 @@ class Runner:
                           "Where-Object { $_.ExecutablePath -eq $env:QUALIFIED_APP_EXE } | "
                           "ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop }"], env=env)
         else:
-            output = self.command(["ps", "-axo", "pid=,ppid=,args="])
+            # Inspect in memory only: unrelated process arguments can contain runner secrets.
+            output = self.command(["ps", "-axo", "pid=,ppid=,args="], record_output=False)
             rows = []
             for line in output.splitlines():
                 fields = line.strip().split(None, 2)
@@ -244,7 +247,10 @@ class Runner:
                         os.kill(pid, 15)
                 except ProcessLookupError:
                     pass
-        time.sleep(1)
+        deadline = time.monotonic() + 10
+        while self.is_running(path) and time.monotonic() < deadline:
+            time.sleep(0.2)
+        require(not self.is_running(path), f"test-owned process did not stop: {path}")
 
     def is_running(self, path):
         if platform.system() == "Windows":
@@ -253,7 +259,7 @@ class Runner:
                                    "Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -eq $env:QUALIFIED_APP_EXE } | "
                                    "ForEach-Object { $_.ProcessId }"], env=env)
             return bool(output.strip())
-        rows = self.command(["ps", "-axo", "args="]).splitlines()
+        rows = self.command(["ps", "-axo", "args="], record_output=False).splitlines()
         return any(row == str(path) or row.startswith(str(path) + " ") for row in rows)
 
     def self_update(self, candidate_exe, artifact, kind):
@@ -294,6 +300,7 @@ class Runner:
                 env = dict(self.env, ARTCRAFT_LAUNCHER_PRETEND_VERSION="0.9.0")
                 self.command([candidate_exe, "--qualify-self-update", root, kind, artifact, target], env=env)
                 result = json.loads((root / "self-update.json").read_text())
+                (self.output / "self-update-native.json").write_text(json.dumps(result, indent=2))
                 require(result["scheduled"] and result["source_sha"] == os.environ["GITHUB_SHA"] and
                         result["candidate_sha256"] == digest(artifact), "wrong self-update scheduled")
                 deadline = time.monotonic() + 90
@@ -338,6 +345,7 @@ class Runner:
                     personal.write_text("keep my project\n")
                 if operation == "launch":
                     launched = result["installed"]
+                    require(self.is_running(self.app_executable(launched)), "no process from the exact installed app path")
                     if kind == "deb":
                         self.stop_app(launched)
                         launched = None
@@ -359,10 +367,12 @@ class Runner:
 
     def gui(self, exe, root):
         report = root / "ui.json"
-        for _ in range(2):
+        for attempt in range(2):
             report.unlink(missing_ok=True)
             self.command([exe, "--qualify-ui", root], timeout=90)
-            require(json.loads(report.read_text())["ui_frames"] >= 3, "launcher never rendered its UI")
+            result = json.loads(report.read_text())
+            require(result["ui_frames"] >= 3, "launcher never rendered its UI")
+            (self.output / f"gui-{root.name}-{attempt}.json").write_text(json.dumps(result, indent=2))
         self.report.setdefault("ui", []).append(root.name)
 
     def run(self):

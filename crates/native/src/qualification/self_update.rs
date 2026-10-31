@@ -18,7 +18,7 @@ pub fn run(args: &[String]) -> Result<(), String> {
     let root = super::checked_root(Path::new(root))?;
     let _ = super::ui_report(&root)?;
     let parent = root.parent().ok_or("no qualification parent")?;
-    let target = std::fs::canonicalize(target).map_err(|e| e.to_string())?;
+    let target = super::canonical(Path::new(target))?;
     if !target.starts_with(parent) {
         return Err("self-update target must be an isolated installation beside the qualification root".into());
     }
@@ -38,7 +38,7 @@ pub fn run(args: &[String]) -> Result<(), String> {
         "appimage" if cfg!(target_os = "linux") && target.extension().is_some_and(|e| e == "AppImage") => Install::AppImage(target.clone()),
         _ => return Err("unsupported self-update qualification target".into()),
     };
-    let candidate = std::fs::canonicalize(candidate).map_err(|e| e.to_string())?;
+    let candidate = super::canonical(Path::new(candidate))?;
     let name = candidate.file_name().and_then(|n| n.to_str()).filter(|n| release::valid_file_name(n)).ok_or("invalid candidate filename")?;
     let sha = crate::http::sha256_file(&candidate)?;
     let tag = format!("v{current}");

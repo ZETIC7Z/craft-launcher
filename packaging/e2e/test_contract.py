@@ -9,7 +9,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from contract import TARGETS, artifact_names, digest, operations, self_update_artifact
+from contract import BINARY_ARCHES, TARGETS, artifact_names, digest, operations, self_update_artifact
 from runner import Runner
 from verify_release import verify
 
@@ -46,6 +46,17 @@ class EvidenceTests(unittest.TestCase):
             folder = self.reports / target
             folder.mkdir(exist_ok=True)
             (folder / f"qualification-{target}.json").write_text(json.dumps(data))
+            # Synthetic evidence is ONLY for testing this validator; never installer proof.
+            for kind in TARGETS[target][2]:
+                for index, operation in enumerate(operations(kind)):
+                    native = dict(schema=1, success=True, operation=operation, launcher_version=self.version,
+                                  build_sha=self.sha, binary_arch=BINARY_ARCHES[target])
+                    (folder / f"{kind}-{index:02d}-{operation}.json").write_text(json.dumps(native))
+                if kind != "deb":
+                    for attempt in range(2):
+                        (folder / f"gui-launcher-e2e-{kind}-{attempt}.json").write_text(json.dumps(dict(schema=1, ui_frames=3)))
+            (folder / "self-update-native.json").write_text(json.dumps(dict(schema=1, scheduled=True, source_sha=self.sha,
+                from_version="0.9.0", to_version=self.version, candidate_sha256=digest(self.artifacts / self_update_artifact(self.version, target)))))
 
     def check(self):
         self.write()
@@ -63,6 +74,26 @@ class EvidenceTests(unittest.TestCase):
         del self.data["macos-x64"]
         with self.assertRaisesRegex(RuntimeError, "missing"):
             self.check()
+
+    def test_green_summary_cannot_hide_missing_or_stale_process_evidence(self):
+        self.write()
+        native_path = self.reports / "windows-x86/msi-00-init.json"
+        native = json.loads(native_path.read_text())
+        native["binary_arch"] = "x86_64"
+        native_path.write_text(json.dumps(native))
+        with self.assertRaisesRegex(RuntimeError, "invalid native result"):
+            verify(self.artifacts, self.reports, self.version, self.sha, self.run_id)
+        native_path.unlink()
+        with self.assertRaisesRegex(RuntimeError, "missing native result"):
+            verify(self.artifacts, self.reports, self.version, self.sha, self.run_id)
+
+    def test_green_summary_requires_both_gui_starts_and_native_update(self):
+        for relative, error in (("macos-arm64/gui-launcher-e2e-dmg-1.json", "missing GUI result"),
+                                ("windows-arm64/self-update-native.json", "missing native self-update")):
+            self.write()
+            (self.reports / relative).unlink()
+            with self.assertRaisesRegex(RuntimeError, error):
+                verify(self.artifacts, self.reports, self.version, self.sha, self.run_id)
 
     def test_stale_source_run_or_version_fails(self):
         for field in ("source_sha", "run_id", "version"):
@@ -106,6 +137,16 @@ class EvidenceTests(unittest.TestCase):
             runner.command(argv)
         with self.assertRaisesRegex(RuntimeError, "exited 2"):
             runner.command([sys.executable, "-c", "raise SystemExit(2)"], allowed=(0, 1))
+
+    def test_process_inventory_is_not_saved_or_exposed_on_failure(self):
+        runner = Runner.__new__(Runner)
+        runner.output, runner.work, runner.env, runner.commands = self.root, self.root, dict(os.environ), 0
+        argv = [sys.executable, "-c", "print('sample-private-process-argument')"]
+        self.assertIn("sample-private", runner.command(argv, record_output=False))
+        with self.assertRaisesRegex(RuntimeError, "process inventory omitted") as failure:
+            runner.command([sys.executable, "-c", "print('sample-private-process-argument'); raise SystemExit(2)"], record_output=False)
+        self.assertNotIn("sample-private", str(failure.exception))
+        self.assertTrue(all("sample-private" not in log.read_text() for log in self.root.glob("*.log")))
 
 
 if __name__ == "__main__":
