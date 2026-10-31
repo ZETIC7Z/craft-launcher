@@ -18,7 +18,7 @@ pub(super) fn verify_with(
     app: &CraftApp,
     bundle: &Path,
     team: &str,
-    mut run: impl FnMut(&str, &[&str], Duration) -> Result<String, String>,
+    mut run: impl FnMut(&str, &[&str], Duration) -> Result<crate::process::RunOutput, String>,
 ) -> Result<(), String> {
     let path = bundle.to_str().ok_or("couldn't check the app's unusual path, so it wasn't installed")?;
     let requirement = identity_requirement(app, team)?;
@@ -30,8 +30,13 @@ pub(super) fn verify_with(
         // notarized result part of verification too (Apple DTS: codesign -R="notarized").
         ("notarization", CODESIGN, vec!["--verify", "--check-notarization", "-R=notarized", path]),
     ] {
-        run(program, &args, TIMEOUT)
+        let output = run(program, &args, TIMEOUT)
             .map_err(|reason| format!("macOS verification did not succeed ({check}: {reason}), so the app wasn't installed"))?;
+        if !output.success {
+            let reason = output.stderr.trim();
+            let reason = if reason.is_empty() { output.status } else { reason.to_string() };
+            return Err(format!("macOS verification did not succeed ({check}: {reason}), so the app wasn't installed"));
+        }
     }
 
     // This documented, read-only query distinguishes a user's global disable from an assessment
@@ -46,7 +51,12 @@ pub(super) fn verify_with(
     // bypass trust/revocation caches or prove a fresh OCSP response.
     let output = run(SPCTL, &["--assess", "--type", "execute", "--ignore-cache", "--no-cache", "--raw", path], TIMEOUT)
         .map_err(|reason| format!("macOS verification did not succeed (macOS policy: {reason}), so the app wasn't installed"))?;
-    if !assessment_accepted(&output) {
+    if !output.success {
+        let reason = output.stderr.trim();
+        let reason = if reason.is_empty() { output.status } else { reason.to_string() };
+        return Err(format!("macOS verification did not succeed (macOS policy: {reason}), so the app wasn't installed"));
+    }
+    if !assessment_accepted(&output.stdout) {
         return Err("macOS didn't return an affirmative policy assessment, so the app wasn't installed".into());
     }
     Ok(())
@@ -58,12 +68,23 @@ enum AssessmentStatus {
     Disabled,
 }
 
-fn assessment_status(output: &str) -> Result<AssessmentStatus, String> {
-    match output.trim() {
-        "assessments enabled" => Ok(AssessmentStatus::Enabled),
-        "assessments disabled" => Ok(AssessmentStatus::Disabled),
-        _ => Err("macOS returned an unknown Gatekeeper status, so the app wasn't installed".into()),
+fn assessment_status(output: &crate::process::RunOutput) -> Result<AssessmentStatus, String> {
+    let stdout = output.stdout.trim();
+    let stderr = output.stderr.trim();
+    let disabled = (stdout == "assessments disabled" && stderr.is_empty()) || (stderr == "assessments disabled" && stdout.is_empty());
+    if disabled && (output.success || output.code == Some(1)) {
+        // `spctl --status` uses exit 1 for its explicit disabled-state output. Preserve and
+        // interpret that result; `process::run` intentionally treats nonzero exits as errors.
+        return Ok(AssessmentStatus::Disabled);
     }
+    if !output.success {
+        let reason = if !stderr.is_empty() { stderr.to_string() } else { output.status.clone() };
+        return Err(format!("couldn't determine Gatekeeper status ({reason}), so the app wasn't installed"));
+    }
+    if stdout == "assessments enabled" && stderr.is_empty() {
+        return Ok(AssessmentStatus::Enabled);
+    }
+    Err("macOS returned an unknown Gatekeeper status, so the app wasn't installed".into())
 }
 
 fn identity_requirement(app: &CraftApp, team: &str) -> Result<String, String> {
@@ -111,6 +132,10 @@ mod tests {
         CraftApp::by_id("solidcraft").unwrap()
     }
 
+    fn success(output: impl Into<String>) -> crate::process::RunOutput {
+        crate::process::RunOutput::success(output)
+    }
+
     // Verbatim stdout captured by the real macOS --raw assessment (receipt 653b8b).
     fn accepted() -> String {
         r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -153,13 +178,13 @@ mod tests {
         verify_with(app, Path::new("/private/owned/SolidCraft.app"), app.mac_team.unwrap(), |program, args, timeout| {
             assert_eq!(timeout, Duration::from_secs(60));
             calls.push((program.to_string(), args.iter().map(|s| s.to_string()).collect::<Vec<_>>()));
-            Ok(if program == SPCTL && args == ["--status"] {
+            Ok(success(if program == SPCTL && args == ["--status"] {
                 "assessments enabled".into()
             } else if program == SPCTL {
                 accepted()
             } else {
                 String::new()
-            })
+            }))
         })
         .unwrap();
         assert_eq!(calls.len(), 5);
@@ -186,7 +211,11 @@ mod tests {
         verify_with(app, Path::new("/private/owned/SolidCraft.app"), app.mac_team.unwrap(), |program, args, timeout| {
             assert_eq!(timeout, TIMEOUT);
             calls.push((program.to_string(), args.iter().map(|s| s.to_string()).collect::<Vec<_>>()));
-            Ok(if program == SPCTL { "assessments disabled".into() } else { String::new() })
+            if program == SPCTL && args == ["--status"] {
+                crate::process::run_with_output("/bin/sh", &["-c", "printf 'assessments disabled\\n'; exit 1"], timeout)
+            } else {
+                Ok(success(String::new()))
+            }
         })
         .unwrap();
         assert_eq!(calls.len(), 4);
@@ -211,9 +240,9 @@ mod tests {
                 if call == failed_call {
                     Err(reason.into())
                 } else if program == SPCTL && args == ["--status"] {
-                    Ok("assessments disabled".into())
+                    Ok(crate::process::RunOutput::exit(1, "assessments disabled", ""))
                 } else {
-                    Ok(String::new())
+                    Ok(success(String::new()))
                 }
             })
             .unwrap_err();
@@ -230,7 +259,7 @@ mod tests {
             let mut calls = 0;
             let error = verify_with(app, Path::new("/private/owned/SolidCraft.app"), "G5QA5U5X2S", |program, args, _| {
                 calls += 1;
-                Ok(if program == SPCTL && args == ["--status"] { output.into() } else { String::new() })
+                Ok(success(if program == SPCTL && args == ["--status"] { output } else { "" }))
             })
             .unwrap_err();
             assert!(error.contains("unknown Gatekeeper status"), "{error}");
@@ -240,7 +269,7 @@ mod tests {
         let mut calls = 0;
         let error = verify_with(app, Path::new("/private/owned/SolidCraft.app"), "G5QA5U5X2S", |program, args, _| {
             calls += 1;
-            if program == SPCTL && args == ["--status"] { Err("helper unavailable".into()) } else { Ok(String::new()) }
+            if program == SPCTL && args == ["--status"] { Err("helper unavailable".into()) } else { Ok(success(String::new())) }
         })
         .unwrap_err();
         assert!(error.contains("couldn't determine Gatekeeper status"), "{error}");
@@ -307,11 +336,11 @@ mod tests {
                     if call == failed {
                         Err(reason.into())
                     } else if program == SPCTL && args == ["--status"] {
-                        Ok("assessments enabled".into())
+                        Ok(success("assessments enabled"))
                     } else if program == SPCTL {
-                        Ok(accepted())
+                        Ok(success(accepted()))
                     } else {
-                        Ok(String::new())
+                        Ok(success(String::new()))
                     }
                 })
                 .unwrap_err();
@@ -347,11 +376,11 @@ mod tests {
                 if call == failed {
                     Err("check unavailable or denied".into())
                 } else if program == SPCTL && args == ["--status"] {
-                    Ok("assessments enabled".into())
+                    Ok(success("assessments enabled"))
                 } else if program == SPCTL {
-                    Ok(accepted())
+                    Ok(success(accepted()))
                 } else {
-                    Ok(String::new())
+                    Ok(success(String::new()))
                 }
             });
             assert!(result.is_err());
@@ -365,11 +394,11 @@ mod tests {
         for output in [String::new(), "not a plist".into(), accepted().replace("<true/>", "<false/>")] {
             let result = check_and_swap(app, &staged, &old, &found, &expect, |program, args, _| {
                 Ok(if program == SPCTL && args == ["--status"] {
-                    "assessments enabled".into()
+                    success("assessments enabled")
                 } else if program == SPCTL {
-                    output.clone()
+                    success(output.clone())
                 } else {
-                    String::new()
+                    success(String::new())
                 })
             });
             assert!(result.is_err());
@@ -395,7 +424,11 @@ mod tests {
 
         check_and_swap(app, &staged, &old, &found, &expect, |program, args, _| {
             calls.push((program.to_string(), args.iter().map(|s| s.to_string()).collect::<Vec<_>>()));
-            Ok(if program == SPCTL { "assessments disabled".into() } else { String::new() })
+            Ok(if program == SPCTL && args == ["--status"] {
+                crate::process::RunOutput::exit(1, "assessments disabled", "")
+            } else {
+                success(String::new())
+            })
         })
         .unwrap();
 
@@ -409,7 +442,7 @@ mod tests {
     #[ignore = "needs the independently staged real release; no app execution or swap"]
     fn mac_install_real_release_passes_the_production_verifier() {
         let bundle = std::env::var_os("ARTCRAFT_LAUNCHER_TEST_STAGED_APP").expect("set the owned staged release path");
-        verify_with(solidcraft(), Path::new(&bundle), "G5QA5U5X2S", crate::process::run).unwrap();
+        verify_with(solidcraft(), Path::new(&bundle), "G5QA5U5X2S", crate::process::run_with_output).unwrap();
     }
 
     #[test]
@@ -440,11 +473,11 @@ mod tests {
         let expect = Expect { team: app.mac_team, version: Some(&version) };
         check_and_swap(app, &staged, &destination, &found, &expect, |program, args, timeout| {
             if program == SPCTL && args == ["--status"] {
-                Ok("assessments disabled".into())
+                Ok(crate::process::RunOutput::exit(1, "assessments disabled", ""))
             } else if program == SPCTL {
                 Err("policy assessment should be skipped when disabled".into())
             } else {
-                crate::process::run(program, args, timeout)
+                crate::process::run_with_output(program, args, timeout)
             }
         })
         .unwrap();
