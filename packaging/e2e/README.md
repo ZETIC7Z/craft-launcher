@@ -90,6 +90,9 @@ missing or inconsistent underlying results fails. Reports must match the current
 and their SHA-256 hashes must match the exact files being uploaded. No rebuild or artifact
 replacement is permitted between qualification and upload. `launcher-qualification.json` is
 included with the release assets so the evidence and limits travel with the candidate.
+Every launcher package, including the Linux tarball, also saves a native identity result tied to
+that package's name/hash. A same-version stale binary or wrong architecture cannot qualify merely
+by printing a plausible `--version` line.
 
 GitHub's artifact digest mismatch is currently a warning, so the gate performs an explicit
 failing comparison rather than relying on the download action alone. See

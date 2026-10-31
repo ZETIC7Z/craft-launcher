@@ -8,6 +8,12 @@ from pathlib import Path
 from contract import BINARY_ARCHES, TARGETS, artifact_names, digest, operations, require, self_update_artifact
 
 
+def verify_native(native, operation, version, sha, target):
+    require(native.get("schema") == 1 and native.get("success") is True and
+            (native.get("operation"), native.get("launcher_version"), native.get("build_sha"), native.get("binary_arch")) ==
+            (operation, version, sha, BINARY_ARCHES[target]), f"{target} invalid native result: {operation}")
+
+
 def verify(artifacts, reports, version, sha, run_id):
     paths = list(reports.rglob("qualification-*.json"))
     require(len(paths) == len(TARGETS), "missing or duplicate platform qualification reports")
@@ -24,6 +30,12 @@ def verify(artifacts, reports, version, sha, run_id):
         for name in names:
             require(report["artifacts"][name] == digest(artifacts / name), f"candidate changed after qualification: {name}")
             require(report.get("packages", {}).get(name) == "installed-executed-and-removed", f"{name} was not removed cleanly")
+            identity_path = path.parent / f"package-{name}.json"
+            require(identity_path.is_file(), f"{target} missing package identity: {name}")
+            identity = json.loads(identity_path.read_text())
+            require((identity.get("artifact"), identity.get("sha256")) == (name, report["artifacts"][name]),
+                    f"{target} package identity belongs to another artifact: {name}")
+            verify_native(identity.get("native", {}), "init", version, sha, target)
         expected_kinds = TARGETS[target][2]
         require(set(report.get("lifecycles", {})) == set(expected_kinds), f"{target} has missing lifecycle formats")
         for kind in expected_kinds:
@@ -32,9 +44,7 @@ def verify(artifacts, reports, version, sha, run_id):
                 native_path = path.parent / f"{kind}-{index:02d}-{operation}.json"
                 require(native_path.is_file(), f"{target}/{kind} missing native result: {operation}")
                 native = json.loads(native_path.read_text())
-                require(native.get("schema") == 1 and native.get("success") is True and
-                        (native.get("operation"), native.get("launcher_version"), native.get("build_sha"), native.get("binary_arch")) ==
-                        (operation, version, sha, BINARY_ARCHES[target]), f"{target}/{kind} invalid native result: {operation}")
+                verify_native(native, operation, version, sha, target)
         require(set(report.get("ui", [])) == {f"launcher-e2e-{kind}" for kind in expected_kinds if kind != "deb"},
                 f"{target} has missing GUI startup proof")
         for root in report["ui"]:

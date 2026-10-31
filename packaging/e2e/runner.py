@@ -69,7 +69,7 @@ class Runner:
         return result.stdout.decode(errors="replace")
 
     def executable(self, directory, name="artcraft-launcher.exe"):
-        matches = list(directory.rglob(name))
+        matches = [path for path in directory.rglob(name) if path.is_file()]
         require(len(matches) == 1, f"expected exactly one {name} under {directory}: {matches}")
         return matches[0]
 
@@ -395,6 +395,12 @@ class Runner:
             with self.installed_launcher(artifact) as exe:
                 require(self.args.version in self.command([exe, "--version"], timeout=60), "wrong launcher version")
                 kind = {".dmg": "dmg", ".msi": "msi", ".zip": "portable", ".deb": "deb", ".AppImage": "appimage"}.get(artifact.suffix)
+                # Every package must prove its executed binary's exact source/version/arch,
+                # including tar.gz, which does not run an app lifecycle of its own.
+                identity_root = self.work / f"launcher-e2e-package-{self.commands}"
+                identity = self.operation(exe, identity_root, kind or "appimage", "init")
+                (self.output / f"package-{name}.json").write_text(json.dumps(dict(
+                    artifact=name, sha256=self.report["artifacts"][name], native=identity), indent=2))
                 if kind:
                     self.lifecycle(exe, kind)
                 if kind in ("dmg", "portable", "appimage"):

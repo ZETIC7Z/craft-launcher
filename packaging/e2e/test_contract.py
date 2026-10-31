@@ -47,6 +47,11 @@ class EvidenceTests(unittest.TestCase):
             folder.mkdir(exist_ok=True)
             (folder / f"qualification-{target}.json").write_text(json.dumps(data))
             # Synthetic evidence is ONLY for testing this validator; never installer proof.
+            for name in artifact_names(self.version, target):
+                identity = dict(artifact=name, sha256=digest(self.artifacts / name), native=dict(
+                    schema=1, success=True, operation="init", launcher_version=self.version,
+                    build_sha=self.sha, binary_arch=BINARY_ARCHES[target]))
+                (folder / f"package-{name}.json").write_text(json.dumps(identity))
             for kind in TARGETS[target][2]:
                 for index, operation in enumerate(operations(kind)):
                     native = dict(schema=1, success=True, operation=operation, launcher_version=self.version,
@@ -95,6 +100,27 @@ class EvidenceTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, error):
                 verify(self.artifacts, self.reports, self.version, self.sha, self.run_id)
 
+    def test_every_package_requires_matching_executed_source_architecture_and_artifact(self):
+        target = "linux-aarch64"
+        name = next(name for name in artifact_names(self.version, target) if name.endswith(".tar.gz"))
+        path = self.reports / target / f"package-{name}.json"
+        for field, value in (("build_sha", "stale-commit"), ("binary_arch", "x86_64"), ("launcher_version", "1.2.30")):
+            self.write()
+            identity = json.loads(path.read_text())
+            identity["native"][field] = value
+            path.write_text(json.dumps(identity))
+            with self.assertRaisesRegex(RuntimeError, "invalid native result"):
+                verify(self.artifacts, self.reports, self.version, self.sha, self.run_id)
+        self.write()
+        identity = json.loads(path.read_text())
+        identity["sha256"] = "00" * 32
+        path.write_text(json.dumps(identity))
+        with self.assertRaisesRegex(RuntimeError, "another artifact"):
+            verify(self.artifacts, self.reports, self.version, self.sha, self.run_id)
+        path.unlink()
+        with self.assertRaisesRegex(RuntimeError, "missing package identity"):
+            verify(self.artifacts, self.reports, self.version, self.sha, self.run_id)
+
     def test_stale_source_run_or_version_fails(self):
         for field in ("source_sha", "run_id", "version"):
             with self.subTest(field=field):
@@ -125,6 +151,20 @@ class EvidenceTests(unittest.TestCase):
         with patch.dict(os.environ, {}, clear=True):
             with self.assertRaisesRegex(RuntimeError, "disposable"):
                 Runner(None)
+
+    def test_tarball_executable_lookup_ignores_same_named_documentation_directory(self):
+        # The real Linux package contains bin/artcraft-launcher AND share/doc/artcraft-launcher.
+        binary = self.root / "bin/artcraft-launcher"
+        binary.parent.mkdir()
+        binary.write_bytes(b"executable fixture")
+        (self.root / "share/doc/artcraft-launcher").mkdir(parents=True)
+        runner = Runner.__new__(Runner)
+        self.assertEqual(runner.executable(self.root, "artcraft-launcher"), binary)
+        duplicate = self.root / "other/artcraft-launcher"
+        duplicate.parent.mkdir()
+        duplicate.write_bytes(b"ambiguous second executable")
+        with self.assertRaisesRegex(RuntimeError, "exactly one"):
+            runner.executable(self.root, "artcraft-launcher")
 
     def test_nonzero_status_preserves_real_subprocess_output(self):
         # Exercise the runner's real wrapper, not a mocked successful command. spctl --status
