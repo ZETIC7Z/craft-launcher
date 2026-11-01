@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Release tag (e.g. v0.10.0)'
+        description: 'Release tag (e.g. v0.10.3)'
         required: true
-        default: 'v0.10.0'
+        default: 'v0.10.3'
 
 permissions:
   contents: write
@@ -54,13 +54,19 @@ jobs:
           Copy-Item dist/release/*-windows-x64-portable.zip dist/release/zetica-hub-windows-x64.zip -Force
           Copy-Item dist/release/zetica-hub-windows-x64.msi dist/release/artcraft-launcher-windows-x64.msi -Force
           Copy-Item dist/release/zetica-hub-windows-x64.zip dist/release/artcraft-launcher-windows-x64-portable.zip -Force
+          Get-ChildItem dist/release/* -File | ForEach-Object {
+            $h = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$h  $($_.Name)"
+          } | Set-Content dist/release/SHA256SUMS.txt -Encoding ascii
           Get-ChildItem dist/release
 
       - name: Upload Windows MSI Artifact
         uses: actions/upload-artifact@v4
         with:
           name: zetica-hub-windows-x64-msi
-          path: dist/release/*.msi
+          path: |
+            dist/release/*.msi
+            dist/release/SHA256SUMS.txt
 
       - name: Upload Windows ZIP Artifact
         uses: actions/upload-artifact@v4

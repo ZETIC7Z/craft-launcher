@@ -169,7 +169,7 @@ pub const SUITE: [CraftApp; 14] = [
     },
     CraftApp {
         former_ids: &["effectcraft", "zetica-motion", "zetica-effect"],
-        former_names: &["EffectCraft", "Zetica Motion", "Zetica Effect", "Effect"],
+        former_names: &["EffectCraft", "Zetica Motion", "Zetica Effect", "Motion", "Effect"],
         ..app(
             "effectcraft",
             "Zetica Motion",
