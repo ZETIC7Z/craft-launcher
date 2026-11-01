@@ -26,6 +26,8 @@ jobs:
       os: '["ubuntu-24.04","windows-latest"]'
       # The launcher bundles its own fonts (assets/fonts/) and builds nothing from craft-fonts.
       craft-fonts-ref: ""
+      # `cargo xtask ci` and the Windows command run cargo test, not nextest.
+      tools: ""
       # egui/winit/wgpu headers. The tray (ksni) and notifications (notify-rust over zbus) are
       # pure-Rust D-Bus clients, so no GTK, appindicator, xdo or libdbus packages are needed.
       packages: libxkbcommon-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev
