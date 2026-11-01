@@ -23,7 +23,7 @@ use crate::time::parse_rfc3339;
 use crate::version;
 
 /// Where the feed lives.
-pub const FEED_URL: &str = "https://zetica.xyz/api/v1/release_info";
+pub const FEED_URL: &str = "https://zetica.vercel.app/api/v1/release_info";
 
 /// An app's entry is trusted for this long after storyteller-web fetched it.
 pub const MAX_AGE: i64 = 24 * 3600;

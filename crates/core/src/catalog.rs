@@ -67,7 +67,7 @@ impl CraftApp {
 
     /// The app's website: its page on getartcraft.com, or a community app's own site.
     pub fn website(&self) -> String {
-        self.site.map_or_else(|| format!("https://zetica.xyz/apps/{}", self.id), str::to_string)
+        self.site.map_or_else(|| format!("https://zetica.vercel.app/apps/{}", self.id), str::to_string)
     }
 
     /// Whether the launcher installs this app from a `kind` package.
@@ -263,7 +263,7 @@ pub const SUITE: [CraftApp; 14] = [
 ];
 
 /// Zetica's website.
-pub const WEBSITE_URL: &str = "https://zetica.xyz";
+pub const WEBSITE_URL: &str = "https://zetica.vercel.app";
 /// The GitHub account every official Craft App's repository lives under.
 pub const GITHUB_OWNER: &str = "ZETIC7Z";
 /// Zetica on GitHub: every Craft App's source.

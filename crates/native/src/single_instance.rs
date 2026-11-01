@@ -66,7 +66,7 @@ const MAX_GREETING: usize = 256;
 fn token() -> Option<String> {
     use std::io::Read;
     let dir =
-        dirs::data_local_dir()?.join(if cfg!(any(target_os = "macos", target_os = "windows")) { "ArtCraft Launcher" } else { "artcraft-launcher" });
+        dirs::data_local_dir()?.join(if cfg!(any(target_os = "macos", target_os = "windows")) { "Zetica Hub" } else { "zetica-hub" });
     let path = dir.join(".instance-token");
     if let Ok(mut f) = std::fs::File::open(&path) {
         let mut s = String::new();
